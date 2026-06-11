@@ -1,0 +1,92 @@
+{
+  "story_id": "W7.3",
+  "title": "W7.3 — MakerRebateModel",
+  "status": "passes",
+  "decided_at_iso": "2026-06-08",
+  "files_added": [
+    "src/kairon/paper/cost.py",
+    "tests/paper/test_maker_rebate.py",
+    "artifacts/w7_3_status.json"
+  ],
+  "files_changed": [],
+  "tests_added": 2,
+  "test_names": [
+    "tests/paper/test_maker_rebate.py::test_limit_order_gets_rebate",
+    "tests/paper/test_maker_rebate.py::test_taker_order_no_rebate"
+  ],
+  "pyright_errors": 0,
+  "pyright_warnings_note": "uv run pyright reports 0 errors on src/kairon/paper/cost.py and tests/paper/test_maker_rebate.py. The 0-error count is the W7.3 pyright --strict requirement. The existing ~700 informational warnings are demoted per pyrightconfig.json.",
+  "pytest_regression": {
+    "passed": 531,
+    "skipped": 16,
+    "failed": 0,
+    "baseline_passed": 529,
+    "delta": 2,
+    "note": "Baseline 529 reflects the W3 + W5 + W6 + W7.1 + W7.2 batch state. W7.3 adds 2 tests: test_limit_order_gets_rebate, test_taker_order_no_rebate. 529 + 2 = 531 passed, 16 skipped, 0 failed, 0 regressions."
+  },
+  "maker_rebate_model": {
+    "name": "MakerRebateModel",
+    "module": "kairon.paper.cost",
+    "config_class": "RebateConfig (frozen dataclass with rebate_bps=0.2, cost: CostModel | None = None)",
+    "constructor": "MakerRebateModel(config: RebateConfig | None = None)",
+    "public_methods": [
+      {
+        "name": "net_cost_bps",
+        "signature": "net_cost_bps(order_kind: Literal['limit', 'market']) -> float",
+        "description": "Returns the net cost in bps of notional. 'limit' => commission_bps - rebate_bps; 'market' => commission_bps (no rebate). Unknown order_kind raises ValueError."
+      },
+      {
+        "name": "net_cost_cash",
+        "signature": "net_cost_cash(notional: float, order_kind: Literal['limit', 'market']) -> float",
+        "description": "Returns the net cost in cash units: notional * net_cost_bps(order_kind) / 1e4. Matches the v1 CostModel.total_cost convention. Negative notional raises ValueError."
+      }
+    ],
+    "public_properties": [
+      {
+        "name": "rebate_bps",
+        "type": "float",
+        "description": "The per-side rebate for limit orders, in bps of notional. Default 0.2 (the v1 BTC venue default for the maker programme)."
+      },
+      {
+        "name": "commission_bps",
+        "type": "float",
+        "description": "The commission read from the underlying CostModel. Returns 0.0 when no CostModel is configured (the v1 contract for tests that don't care about commission)."
+      }
+    ]
+  },
+  "test_evidence": {
+    "test_limit_order_gets_rebate": "1 BTC limit order at 50,000 USDT with commission_bps=10, rebate_bps=0.2: net cost = 9.8 bps; cash cost = 50_000 * 9.8 / 1e4 = 49.0 USDT.",
+    "test_taker_order_no_rebate": "1 BTC market order at 50,000 USDT with commission_bps=10, rebate_bps=0.2: net cost = 10 bps; cash cost = 50_000 * 10 / 1e4 = 50.0 USDT. The differential between market and limit is exactly the rebate (0.2 bps, or 1.0 USDT in cash for a 50,000 USDT notional)."
+  },
+  "acceptance_criteria_check": [
+    {
+      "id": "maker_rebate_module_exists",
+      "passes": true,
+      "evidence": "src/kairon/paper/cost.py created with RebateConfig, MakerRebateModel, and OrderKind (Literal['limit', 'market']). The module is pure: no IO, no async, no global state. The v1 contract is (rebate_bps=0.2, cost=CostModel(commission_bps=10.0)). The model is a thin additive layer over CostModel; the v1 CostModel contract is unchanged."
+    },
+    {
+      "id": "test_limit_order_gets_rebate_passes",
+      "passes": true,
+      "evidence": "tests/paper/test_maker_rebate.py::test_limit_order_gets_rebate passes. With commission_bps=10 and rebate_bps=0.2, a 1 BTC limit order at 50,000 USDT produces a net cost of (10 - 0.2) = 9.8 bps and a cash cost of 49.0 USDT. The rebate is positive (the trader is paid to add liquidity), so the limit order's net cost is strictly less than the commission."
+    },
+    {
+      "id": "test_taker_order_no_rebate_passes",
+      "passes": true,
+      "evidence": "tests/paper/test_maker_rebate.py::test_taker_order_no_rebate passes. With commission_bps=10 and rebate_bps=0.2, a 1 BTC market order at 50,000 USDT produces a net cost of 10 bps (no rebate) and a cash cost of 50.0 USDT. The market-limit differential is exactly the rebate (0.2 bps). Defensive: unknown order_kind ('stop') raises ValueError; negative notional raises ValueError."
+    },
+    {
+      "id": "pyright_strict_zero_errors",
+      "passes": true,
+      "evidence": "uv run pyright reports 0 errors on src/kairon/paper/cost.py and tests/paper/test_maker_rebate.py. The 0-error count is the W7.3 pyright --strict requirement."
+    },
+    {
+      "id": "full_suite_no_regression",
+      "passes": true,
+      "evidence": "uv run pytest --tb=short -q: 531 passed, 16 skipped, 0 failed (baseline 529 + 2 new W7.3 tests, 0 regressions). The maker_rebate module is additive to the paper package; the v1 CostModel contract is unchanged."
+    }
+  ],
+  "deviation_from_spec": {
+    "rebate_source_is_cost_model": "The plan says the rebate model is a thin layer that takes the commission from the existing CostModel. The implementation reads commission_bps from the supplied CostModel (configurable via the RebateConfig.cost field; default None means zero commission). This preserves the v1 CostModel contract (W2 calibration, W3 backtest, W6 sizer) — the maker rebate is consumed at the paper-trader level, not at the backtest level."
+  },
+  "notes": "W7.3 ships the MakerRebateModel with a +0.2 bps rebate for limit orders and 0 bps for market (taker) orders. The net cost is commission_bps - rebate_bps for limit orders; commission_bps for market orders. The 2 new tests pin the W7.3 acceptance criteria: limit order rebate (1 BTC at 50,000 USDT with commission=10 bps, rebate=0.2 bps produces net=9.8 bps and cash=49.0 USDT), and taker no-rebate (same order as a market produces net=10 bps and cash=50.0 USDT). The module is pure and additive; the v1 CostModel contract is unchanged. The paper trader can now wire the maker rebate into the order submission path to model venue-specific maker-taker fee schedules."
+}

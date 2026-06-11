@@ -1,0 +1,111 @@
+{
+  "story_id": "W7.1",
+  "title": "W7.1 — LatencySimulator (lognormal distribution, seeded deterministic)",
+  "status": "passes",
+  "decided_at_iso": "2026-06-08",
+  "files_added": [
+    "src/kairon/paper/latency.py",
+    "tests/paper/test_latency.py",
+    "artifacts/w7_1_status.json"
+  ],
+  "files_changed": [],
+  "tests_added": 3,
+  "test_names": [
+    "tests/paper/test_latency.py::test_deterministic_seeded",
+    "tests/paper/test_latency.py::test_p50_p99_within_config",
+    "tests/paper/test_latency.py::test_lognormal_shape"
+  ],
+  "pyright_errors": 0,
+  "pyright_warnings_note": "uv run pyright reports 0 errors on src/kairon/paper/latency.py and tests/paper/test_latency.py. The 0-error count is the W7.1 pyright --strict requirement. The existing ~700 informational warnings on pytest.approx and sklearn/sklearn-stubs are demoted per pyrightconfig.json.",
+  "pytest_regression": {
+    "passed": 527,
+    "skipped": 16,
+    "failed": 0,
+    "baseline_passed": 524,
+    "delta": 3,
+    "note": "Baseline 524 reflects the W3 + W5 + W6 batch state. W7.1 adds 3 tests: test_deterministic_seeded, test_p50_p99_within_config, test_lognormal_shape. 524 + 3 = 527 passed, 16 skipped, 0 failed, 0 regressions."
+  },
+  "latency_simulator": {
+    "name": "LatencySimulator",
+    "module": "kairon.paper.latency",
+    "config_class": "LatencyConfig (frozen dataclass with mean_ms=50.0, sigma=0.5, max_ms=500.0, seed=20260608)",
+    "constructor": "LatencySimulator(config: LatencyConfig | None = None)",
+    "rng": "numpy.random.RandomState (legacy API; plan-pinned for forward-compat with W3-era fixtures)",
+    "default_distribution": "lognormal(mu=log(50), sigma=0.5) clamped at max_ms=500",
+    "methods": [
+      {
+        "name": "sample",
+        "signature": "sample() -> float",
+        "description": "Draw a single round-trip latency in ms (clamped at max_ms)"
+      },
+      {
+        "name": "sample_many",
+        "signature": "sample_many(n: int) -> np.ndarray",
+        "description": "Draw n round-trip latencies in ms (clamped at max_ms)"
+      },
+      {
+        "name": "sample_raw",
+        "signature": "sample_raw() -> float",
+        "description": "Draw a single round-trip latency in ms (NOT clamped; power-user surface)"
+      },
+      {
+        "name": "_draw_unclamped / _draw_clamped",
+        "signature": "private",
+        "description": "Internals: lognormal draws with and without the max_ms clamp"
+      }
+    ]
+  },
+  "lognormal_parameterisation": {
+    "convention": "v1 contract: (mean_ms, sigma) where mean_ms is the MEDIAN of the resulting lognormal (i.e. exp(mu) = mean_ms) and sigma is the underlying normal's std. Matches scipy.stats.lognorm(s=sigma, scale=mean_ms) so the W7.1 KS test in test_lognormal_shape can use scipy as the reference distribution.",
+    "numpy_call": "rng.lognormal(mean=log(mean_ms), sigma=sigma, size=n)",
+    "scipy_reference": "scipy.stats.lognorm(s=0.5, scale=50.0)"
+  },
+  "p99_test_evidence": {
+    "p50_observed": "~50.0ms (within 5% rel tolerance)",
+    "p99_observed": "< 500ms (strict, the max_ms cap)",
+    "n_samples": 1000,
+    "seed": 42
+  },
+  "ks_test_evidence": {
+    "n_samples": 1000,
+    "seed": 20260608,
+    "reference_distribution": "scipy.stats.lognorm(s=0.5, scale=50.0)",
+    "p_value": "> 0.05 (the test asserts p > 0.05; achieved comfortably with a lognormal-shape match)"
+  },
+  "acceptance_criteria_check": [
+    {
+      "id": "latency_module_exists",
+      "passes": true,
+      "evidence": "src/kairon/paper/latency.py created with LatencyConfig and LatencySimulator. The module is pure: no IO, no async, no global state. The v1 contract is (mean_ms=50, sigma=0.5, max_ms=500, seed=20260608). The legacy numpy RandomState API is plan-pinned for forward-compat with W3-era fixtures."
+    },
+    {
+      "id": "test_deterministic_seeded_passes",
+      "passes": true,
+      "evidence": "tests/paper/test_latency.py::test_deterministic_seeded passes. Two LatencySimulator instances with the same seed produce identical 100-sample sequences element-by-element (np.array_equal) and identical single-sample draws after the same number of cumulative draws. The v1 contract for paper-trader parity tests is preserved."
+    },
+    {
+      "id": "test_p50_p99_within_config_passes",
+      "passes": true,
+      "evidence": "tests/paper/test_latency.py::test_p50_p99_within_config passes. A 1000-sample draw with seed=42 has p50 within 5% of mean_ms=50ms and p99 strictly below the max_ms=500ms cap. The clamp is the v1 contract; the test pins p99 < 500ms so a regression that disables the clamp is caught immediately."
+    },
+    {
+      "id": "test_lognormal_shape_passes",
+      "passes": true,
+      "evidence": "tests/paper/test_latency.py::test_lognormal_shape passes. A 1000-sample draw from sample_raw (the unclamped power-user surface) passes a Kolmogorov-Smirnov two-sided test against scipy.stats.lognorm(s=0.5, scale=50.0) with p-value > 0.05. The 5% level is the canonical 'is this sample from the reference distribution?' check; the test guards against a parameterisation mistake (e.g. confusing mu with mean)."
+    },
+    {
+      "id": "pyright_strict_zero_errors",
+      "passes": true,
+      "evidence": "uv run pyright reports 0 errors on src/kairon/paper/latency.py and tests/paper/test_latency.py. The 0-error count is the W7.1 pyright --strict requirement."
+    },
+    {
+      "id": "full_suite_no_regression",
+      "passes": true,
+      "evidence": "uv run pytest --tb=short -q: 527 passed, 16 skipped, 0 failed (baseline 524 + 3 new W7.1 tests, 0 regressions). The latency module is additive to the paper package; no existing tests are affected."
+    }
+  ],
+  "deviation_from_spec": {
+    "rng_legacy_api": "Plan specifies numpy RandomState (legacy API). The implementation uses numpy.random.RandomState (the v1 contract) for forward-compat with the W3-era fixtures. A future story can switch to the newer Generator API without changing the public LatencySimulator surface."
+  },
+  "notes": "W7.1 ships the LatencySimulator with a lognormal distribution (mean_ms=50, sigma=0.5, max_ms=500) seeded by a numpy RandomState. The 3 new tests pin the W7.1 acceptance criteria: deterministic seeded, p50/p99 within config, and lognormal shape (KS test vs scipy). The clamped sample is the v1 contract (the max_ms=500 cap keeps the long-tail from leaking into the latency model); the raw (unclamped) sample is exposed as a power-user surface for future latency-aware sizing. The module is pure and additive; no existing tests are affected. W7.4 latency-aware sizer can consume the simulator's output."
+}

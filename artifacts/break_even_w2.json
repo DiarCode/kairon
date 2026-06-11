@@ -1,0 +1,143 @@
+{
+  "schema_version": "1",
+  "story_id": "W2.2",
+  "decided_at_iso": "2026-06-07",
+  "assets": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT"
+  ],
+  "horizons": [
+    "5m",
+    "15m",
+    "1h",
+    "1d"
+  ],
+  "viable_threshold": 0.6,
+  "cost_models": {
+    "BTCUSDT": {
+      "commission_bps": 10.0,
+      "slippage_bps": 2.0,
+      "half_spread_bps": 2.0,
+      "round_trip_bps": 28.0,
+      "impact_coefficient": 0.0
+    },
+    "ETHUSDT": {
+      "commission_bps": 10.0,
+      "slippage_bps": 2.0,
+      "half_spread_bps": 2.0,
+      "round_trip_bps": 28.0,
+      "impact_coefficient": 0.0
+    },
+    "SOLUSDT": {
+      "commission_bps": 10.0,
+      "slippage_bps": 2.0,
+      "half_spread_bps": 2.0,
+      "round_trip_bps": 28.0,
+      "impact_coefficient": 0.0
+    }
+  },
+  "rows": [
+    {
+      "asset": "BTCUSDT",
+      "horizon": "5m",
+      "expected_move_bps": 334.85519258330163,
+      "round_trip_cost_bps": 28.0,
+      "break_even_pct": 0.541809117224656,
+      "viable": true
+    },
+    {
+      "asset": "BTCUSDT",
+      "horizon": "15m",
+      "expected_move_bps": 338.325287260648,
+      "round_trip_cost_bps": 28.0,
+      "break_even_pct": 0.5413802944301184,
+      "viable": true
+    },
+    {
+      "asset": "BTCUSDT",
+      "horizon": "1h",
+      "expected_move_bps": 422.90660907581,
+      "round_trip_cost_bps": 28.0,
+      "break_even_pct": 0.5331042355440947,
+      "viable": true
+    },
+    {
+      "asset": "BTCUSDT",
+      "horizon": "1d",
+      "expected_move_bps": 295.9729717389748,
+      "round_trip_cost_bps": 28.0,
+      "break_even_pct": 0.547301616487964,
+      "viable": true
+    },
+    {
+      "asset": "ETHUSDT",
+      "horizon": "5m",
+      "expected_move_bps": 435.311750358292,
+      "round_trip_cost_bps": 28.0,
+      "break_even_pct": 0.5321608594035815,
+      "viable": true
+    },
+    {
+      "asset": "ETHUSDT",
+      "horizon": "15m",
+      "expected_move_bps": 439.8228734388424,
+      "round_trip_cost_bps": 28.0,
+      "break_even_pct": 0.5318309957154757,
+      "viable": true
+    },
+    {
+      "asset": "ETHUSDT",
+      "horizon": "1h",
+      "expected_move_bps": 549.7785917985531,
+      "round_trip_cost_bps": 28.0,
+      "break_even_pct": 0.5254647965723805,
+      "viable": true
+    },
+    {
+      "asset": "ETHUSDT",
+      "horizon": "1d",
+      "expected_move_bps": 384.76486326066725,
+      "round_trip_cost_bps": 28.0,
+      "break_even_pct": 0.5363858588368954,
+      "viable": true
+    },
+    {
+      "asset": "SOLUSDT",
+      "horizon": "5m",
+      "expected_move_bps": 602.739346649943,
+      "round_trip_cost_bps": 28.0,
+      "break_even_pct": 0.5232272873470311,
+      "viable": true
+    },
+    {
+      "asset": "SOLUSDT",
+      "horizon": "15m",
+      "expected_move_bps": 608.9855170691665,
+      "round_trip_cost_bps": 28.0,
+      "break_even_pct": 0.5229890524611769,
+      "viable": true
+    },
+    {
+      "asset": "SOLUSDT",
+      "horizon": "1h",
+      "expected_move_bps": 761.2318963364581,
+      "round_trip_cost_bps": 28.0,
+      "break_even_pct": 0.5183912419689415,
+      "viable": true
+    },
+    {
+      "asset": "SOLUSDT",
+      "horizon": "1d",
+      "expected_move_bps": 532.7513491301547,
+      "round_trip_cost_bps": 28.0,
+      "break_even_pct": 0.5262786758266467,
+      "viable": true
+    }
+  ],
+  "headline": {
+    "max_break_even_pct": 0.547301616487964,
+    "viable_rows": 12,
+    "total_rows": 12
+  }
+}

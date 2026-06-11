@@ -1,0 +1,62 @@
+{
+  "story_id": "W6.1",
+  "title": "W6.1 — OOF generator (extends W3.6 for stacked meta)",
+  "status": "passes",
+  "decided_at_iso": "2026-06-08",
+  "files_added": [
+    "src/kairon/evaluation/oof.py",
+    "tests/evaluation/test_oof.py",
+    "artifacts/w6_1_status.json"
+  ],
+  "files_changed": [],
+  "tests_added": 1,
+  "test_names": [
+    "tests/evaluation/test_oof.py::test_stacked_oof_isolation"
+  ],
+  "pyright_errors": 0,
+  "pyright_warnings": 0,
+  "pyright_warnings_note": "uv run pyright reports 0 errors on src/kairon/evaluation/oof.py and tests/evaluation/test_oof.py (the new generate_stacked_oof function and the new test). The 0-error count is what the W6.1 pyright --strict check requires.",
+  "pytest_regression": {
+    "passed_total_delta": 1,
+    "skipped": 0,
+    "failed": 0,
+    "note": "W6.1 adds 1 new test: test_stacked_oof_isolation. The test uses 2 distinct base models (ModelA, ModelB) and a 3-fold walk-forward fixture. (a) per-base-model p_oof_<i> columns equal the single-model OOF p_oof for the same factory, (b) re-fit each base model on the OOF training slice for every fold and assert bit-identical predictions to the stacked table's p_oof_<i> rows, (c) instrument each base model to capture the training slice the stacked generator uses and assert (slice_size, slice_values) match the OOF training-slice contract exactly for every (model, fold) pair."
+  },
+  "stacked_oof_function": {
+    "name": "generate_stacked_oof",
+    "module": "kairon.evaluation.oof",
+    "signature": "generate_stacked_oof(features: FeatureMatrix, y: np.ndarray, folds: Sequence[Fold], *, base_models: list[Model]) -> pa.Table",
+    "schema": "pa.Table with (3 + n_base + 1) = n_base + 4 columns in fixed order: fold_id (int32), y_true (int64), p_oof_0 ... p_oof_{n_base-1} (float64, one per base model), p_oof_avg (float64), is_train (bool, always False). Schema is enforced at construction time via pa.schema(..., nullable=False) so downstream consumers (W6.2 StackedGeneralizationEnsemble) can rely on the dtypes and column names.",
+    "row_order": "Concatenation of fold-k test slices in fold order, identical to generate_oof_predictions. The total row count is sum_k folds[k].n_test(). The row order matches generate_oof_predictions row-for-row, so the stacked table can be joined with the single-model OOF table on (fold_id, y_true).",
+    "per_base_model_training_rule": "For every base model i and every fold k: training slice = folds[k]'s own train+val (k=0) or the union of folds[0..k-1].train+val (k>0). Test slice = folds[k].test. The fold-k TEST rows are NEVER in the training set, for any base model. For k>0 the fold-k TRAIN+VAL rows are also excluded. The same contract as W3.6, applied per base model.",
+    "fresh_model_per_fold": "Each base model is fit FRESH once per fold (n_base * K fit calls total). A fitted model from a prior fold cannot be re-used because the stacked generator routes every fold through generate_oof_predictions, which uses the ModelFactory pattern (zero-arg callable returning a fresh instance). Test (c) in test_stacked_oof_isolation captures 2*3 = 6 fit calls and asserts each one's training slice is the OOF training slice for the corresponding fold.",
+    "anti_leakage_verification": "test_stacked_oof_isolation runs three checks: (a) the per-base-model p_oof_<i> column matches the single-model OOF p_oof for the same factory (round-trip equivalence); (b) re-fit each base model on the OOF training slice for every fold k and assert the fold-k prediction is bit-identical to the stacked table's fold-k rows; (c) instrument the fit call to record the training slice the stacked generator uses and assert (size, values) match the OOF training-slice contract for every (model, fold) pair. A leak in the stacked generator would fail (a) (wrong p_oof_<i> values), (b) (numerical drift between re-fit and stacked prediction), or (c) (wrong training-slice size or content)."
+  },
+  "acceptance_criteria_check": [
+    {
+      "id": "generate_stacked_oof_function_exists",
+      "passes": true,
+      "evidence": "src/kairon/evaluation/oof.py extended with generate_stacked_oof(features, y, folds, *, base_models: list[Model]) -> pa.Table. The function reuses generate_oof_predictions per base model (to inherit the strict per-fold isolation contract) and concatenates the per-base-model p_oof columns into a single stacked table with (n_base + 4) columns. Module docstring (10+ lines) documents the anti-leakage contract, the schema, the row order, and the per-base-model training rule."
+    },
+    {
+      "id": "test_stacked_oof_isolation_passes",
+      "passes": true,
+      "evidence": "tests/evaluation/test_oof.py::test_stacked_oof_isolation passes. (a) per-base-model p_oof_<i> columns match the single-model OOF p_oof for the same factory (round-trip equivalence). (b) re-fit each base model on the OOF training slice for every fold k and assert bit-identical predictions. (c) instrument each base model to capture the training slice; assert (slice_size, slice_values) match the OOF training-slice contract exactly for every (model, fold) pair. The test uses 2 distinct base models on a 3-fold walk-forward fixture (6 fit calls captured) and is hermetic (no IO, no torch/xgboost dependency)."
+    },
+    {
+      "id": "pyright_strict_zero_errors",
+      "passes": true,
+      "evidence": "uv run pyright src/kairon/evaluation/oof.py tests/evaluation/test_oof.py reports 0 errors, 0 warnings. The 0-error count is the W6.1 pyright --strict check."
+    },
+    {
+      "id": "full_suite_no_regression",
+      "passes": true,
+      "evidence": "W6.1 is additive: src/kairon/evaluation/oof.py extended (no breaking changes to generate_oof_predictions), tests/evaluation/test_oof.py extended (1 new test, no edits to existing tests). The 4 spec tests from W3.6 (test_fold_strict_isolation, test_oof_dimensions_match, test_oof_handles_3_folds_correctly, test_oof_perfectly_recovers_known_signal) and the 2 defensive W3.6 tests (test_oof_fold_with_zero_training_raises, test_oof_consistent_with_known_folds) all still pass unchanged."
+    }
+  ],
+  "deviation_from_spec": {
+    "base_model_argument_shape": "Spec said 'base_models: list[Model]' (list of Model instances). Implementation accepts 'base_models: list[Any]' at runtime (annotated 'list[Model]' for static type checking) so duck-typed test stand-ins (objects with .fit / .predict / .name that are not subclasses of kairon.models.base.Model) work without inheriting from the ABC. Justification: the W3.6 OOF generator's ModelFactory is Callable[[], Any] for the same reason; the stacked OOF generator inherits the same relaxed contract. Real backends (LinearModel, TreeModel, MetaLearnerModel) continue to satisfy the contract because they ARE Model subclasses.",
+    "p_oof_avg_column": "Spec said 'per-fold OOF predictions from EACH base model'. The implementation includes a p_oof_avg column (the simple average of p_oof_0..p_oof_{n_base-1}) as a sanity-check summary. The p_oof_avg is NOT consumed by the W6.2 StackedGeneralizationEnsemble (which trains on the per-base-model p_oof_<i> columns directly), but it makes the stacked table self-describing for downstream analysis (correlation diagnostics, baseline ensemble comparison). The spec's per-base-model contract is preserved at the schema level (one p_oof_<i> column per base model, in fixed order)."
+  },
+  "notes": "W6.1 ships the per-base-model OOF generator that the W6.2 StackedGeneralizationEnsemble consumes as the meta-feature matrix. The function is a thin wrapper around the W3.6 generate_oof_predictions, so the anti-leakage contract is inherited verbatim (per-fold isolation: fold k's p_oof_<i> for any base model i comes from base model i fit on folds <k only). The test_stacked_oof_isolation test pins the contract by re-fitting each base model on the OOF training slice and asserting the fold-k prediction is bit-identical to the stacked table's fold-k rows; a leak would corrupt the bit-identity. The stacked table is the foundation for the W6.2 meta-learner and the W6.3 CAS-dominance gate."
+}

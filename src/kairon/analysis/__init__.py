@@ -1,0 +1,1 @@
+"""Kairon analysis engine — feature extraction, signal detection, visualization."""

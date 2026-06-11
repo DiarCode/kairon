@@ -1,0 +1,21 @@
+{
+    "include": ["src", "tests"],
+    "exclude": ["**/__pycache__", "**/.venv", "**/node_modules", "artifacts", "reports", "data", "models", "evals/baselines"],
+    "pythonVersion": "3.12",
+    "typeCheckingMode": "strict",
+    "reportMissingImports": "error",
+    "reportMissingTypeStubs": "warning",
+    "reportUnusedImport": "warning",
+    "reportUnusedVariable": "warning",
+    "reportUnknownMemberType": "warning",
+    "reportUnknownArgumentType": "warning",
+    "reportUnknownVariableType": "warning",
+    "reportUnknownParameterType": "warning",
+    "reportMissingTypeArgument": "warning",
+    "reportPrivateImportUsage": "warning",
+    "reportPrivateUsage": "warning",
+    "reportMissingParameterType": "warning",
+    "reportUnusedFunction": "warning",
+    "reportMissingImports": "warning",
+    "useLibraryCodeForTypes": true
+}

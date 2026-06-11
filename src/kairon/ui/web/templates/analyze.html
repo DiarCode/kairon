@@ -1,0 +1,34 @@
+{% extends "layout.html" %}
+{% block body %}
+<section class="kairon-glass-card kairon-screen">
+    <h1 class="kairon-screen-title">Analyzing</h1>
+    <div class="kairon-progress-ring" role="progressbar" aria-valuemin="0" aria-valuemax="4" aria-valuenow="0" id="progress-ring">
+        <div class="kairon-progress-ring-stage" id="progress-stage">Parsing CSV</div>
+    </div>
+    <a class="kairon-text-link" href="/upload">cancel</a>
+    <script>
+        (function() {
+            const stages = [
+                ['parsing', 'Parsing CSV'],
+                ['features', 'Computing features'],
+                ['predicting', 'Predicting'],
+                ['rendering', 'Rendering'],
+                ['done', 'Done']
+            ];
+            const ring = document.getElementById('progress-ring');
+            const lbl = document.getElementById('progress-stage');
+            let i = 0;
+            function tick() {
+                if (i >= stages.length) { return; }
+                const [code, label] = stages[i];
+                lbl.textContent = label;
+                ring.setAttribute('aria-valuenow', String(i));
+                i += 1;
+                if (i < stages.length) setTimeout(tick, 500);
+                else { setTimeout(() => { window.location.href = '/result/' + (new URLSearchParams(window.location.search).get('run_id') || '') + '?from=analyze'; }, 500); }
+            }
+            tick();
+        })();
+    </script>
+</section>
+{% endblock %}

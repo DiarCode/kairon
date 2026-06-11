@@ -1,0 +1,28 @@
+{
+  "decided_at_iso": "2026-06-07T11:42:00Z",
+  "collected_by": "ralph iteration 1, baseline check (uv run pytest)",
+  "command": "uv run pytest --tb=no -q",
+  "duration_seconds": 24.46,
+  "passed": 394,
+  "failed": 0,
+  "skipped": 15,
+  "skip_reasons": {
+    "tests/models/test_lstm.py:17": "torch not installed",
+    "tests/models/test_nbeats.py:18": "torch not installed",
+    "tests/api/test_app.py:24": "fastapi not installed",
+    "tests/api/test_app.py:34": "fastapi not installed",
+    "tests/api/test_app.py:50": "fastapi not installed",
+    "tests/api/test_app.py:65": "fastapi not installed",
+    "tests/api/test_app.py:78": "fastapi not installed",
+    "tests/api/test_app.py:95": "fastapi not installed",
+    "tests/api/test_app.py:113": "fastapi not installed",
+    "tests/llm/test_client.py:74": "ollama installed; can't test no-op path",
+    "tests/models/test_backends.py:116": "xgboost not installed (uv sync --extra ml)",
+    "tests/models/test_backends.py:145": "lightgbm not installed (uv sync --extra ml)",
+    "tests/models/test_deep_ensemble.py:72": "torch not installed",
+    "tests/models/test_public_api.py:46": "torch not installed",
+    "tests/models/test_tracking.py:23": "mlflow not installed"
+  },
+  "matches_production_md": true,
+  "production_md_quote": "uv run pytest        # 394 passed, 15 skipped (optional deps)"
+}

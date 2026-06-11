@@ -1,0 +1,61 @@
+# Kairon web app — single-service Compose stack.
+# Run:  docker compose up --build
+# Open: http://localhost:47829/upload
+#
+# Port 47829 was chosen as a "big number" — well above the IANA registered
+# range (0-49151) and the IANA dynamic/private range (49152-65535), so it is
+# highly unlikely to collide with anything else on the host. The choice is
+# deliberately fixed: 47829 = 0xBAD1, easy to remember, easy to grep for in
+# logs.
+#
+# Bind mounts:
+#   ./assets  -> /app/assets  (the earth background; served at /static/earth.png)
+#   ./data    -> /app/data    (the RunStore sqlite db; persisted across restarts)
+#   ./runs    -> /app/runs    (per-run CSVs and chart PNGs; persisted)
+#   ./reports -> /app/reports (CLI dashboard outputs, if you ever run `kairon analyze` inside the container)
+
+name: kairon
+
+services:
+  kairon:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: kairon:local
+    container_name: kairon-web
+    restart: unless-stopped
+    ports:
+      - "47829:47829"
+    volumes:
+      - ./assets:/app/assets:ro
+      - ./data:/app/data
+      - ./runs:/app/runs
+      - ./reports:/app/reports
+    environment:
+      # Force stdout flushing so `docker compose logs` is live.
+      PYTHONUNBUFFERED: "1"
+      # The Kairon app reads the earth background from the repo's assets/
+      # directory. We bind-mount it read-only, so this is informational.
+      KAIRON_EARTH_BG: "/app/assets/image.png"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request, sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:47829/healthz', timeout=2).status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    # Resource limits: cap memory at 2GB (the heavy ML deps can be hungry
+    # on first analysis). CPU limit is generous so the first request after
+    # startup has the headroom it needs.
+    #
+    # NOTE: We intentionally do NOT use ``deploy.resources.limits.memory``
+    # because Windows / WSL2 / Rancher Desktop kernels don't always
+    # support the cgroup v2 swap-limit capability. Setting a hard memory
+    # cap on those kernels produces a "kernel does not support swap
+    # limit capabilities" warning and (on some hosts) silently falls
+    # back to no-limit. We get the same effect — preventing OOM kills
+    # from running away — by setting the container-level ``mem_limit``
+    # on the compose service, which uses the host's hard memory cap
+    # mechanism (Docker's --memory flag) rather than cgroup swap limits.
+    mem_limit: 2g
+    mem_reservation: 512m
+    cpus: "2.0"

@@ -1,0 +1,141 @@
+{
+  "story_id": "W2.5",
+  "title": "W2.5 — GO/NO-GO gate",
+  "status": "passes",
+  "decided_at_iso": "2026-06-07",
+  "files_added": [
+    "src/kairon/evaluation/w2_5_gate.py",
+    "tests/evaluation/test_w2_5_gate.py",
+    "artifacts/w2_5_decision.json",
+    "artifacts/w2_5_status.json"
+  ],
+  "files_changed": [],
+  "tests_added": 5,
+  "test_names": [
+    "tests/evaluation/test_w2_5_gate.py::test_proceed_when_all_viable",
+    "tests/evaluation/test_w2_5_gate.py::test_escalate_when_any_row_above_threshold",
+    "tests/evaluation/test_w2_5_gate.py::test_halt_when_all_above_threshold",
+    "tests/evaluation/test_w2_5_gate.py::test_decision_writes_artifact",
+    "tests/evaluation/test_w2_5_gate.py::test_gate_includes_cost_sensitivity_flag"
+  ],
+  "pyright_errors": 0,
+  "pyright_warnings": 0,
+  "pyright_warnings_note": "0 warnings on the new files. The W2.5 module and test file use only stdlib + typing; pytest.approx is not referenced.",
+  "pytest_regression": {
+    "passed": 478,
+    "skipped": 15,
+    "failed": 0,
+    "baseline_passed": 473,
+    "delta": 5,
+    "note": "Baseline 473 reflects the W1.x total (464) + W2.1 (+4) + W2.2 (+5). W2.5 adds 5. Total: 478 passed, 15 skipped, 0 failed, 0 regressions. The 5 new tests are: test_proceed_when_all_viable, test_escalate_when_any_row_above_threshold, test_halt_when_all_above_threshold, test_decision_writes_artifact, test_gate_includes_cost_sensitivity_flag."
+  },
+  "gate_function": {
+    "name": "w2_5_go_no_go",
+    "module": "kairon.evaluation.w2_5_gate",
+    "signature": "w2_5_go_no_go(*, break_even_path: str | Path = 'artifacts/break_even_w2.json', halt_threshold_pct: float = 0.80, escalate_threshold_pct: float = 0.80, cost_sensitivity_path: str | Path | None = None) -> dict[str, Any]",
+    "returns": "dict with keys {max_break_even_pct, n_assets, n_horizons, n_viable, n_above_halt, n_above_escalate, decision, decided_at_iso, rationale, report_path, cost_sensitivity_present}",
+    "decision_logic": {
+      "halt": "if any_above_halt AND all_non_viable -> HALT",
+      "escalate": "elif any_above_escalate -> ESCALATE",
+      "proceed": "else -> PROCEED",
+      "halt_threshold_default": 0.80,
+      "escalate_threshold_default": 0.80
+    },
+    "side_effects": "Writes the decision record to artifacts/w2_5_decision.json (relative to CWD).",
+    "raises_on": "FileNotFoundError if break_even_path does not exist; ValueError on non-dict sidecar, missing rows, empty rows, missing break_even_pct/viable, non-numeric break_even_pct, non-boolean viable, or threshold arguments outside (0, 1]."
+  },
+  "gate_verdict": {
+    "decision": "PROCEED",
+    "max_break_even_pct": 0.547301616487964,
+    "n_assets": 3,
+    "n_horizons": 4,
+    "n_viable": 12,
+    "n_above_halt": 0,
+    "n_above_escalate": 0,
+    "cost_sensitivity_present": false,
+    "rationale_excerpt": "max(break_even_pct)=0.5473 across 12 rows (3 assets x 4 horizons). Halt threshold=0.80 (rows above: 0). Escalate threshold=0.80 (rows above: 0). Viable rows: 12/12. Decision=PROCEED."
+  },
+  "w2_3_dependency": {
+    "w2_3_status": "passes=false (per the PRD; not yet implemented)",
+    "cost_sensitivity_artifact_present": false,
+    "impact_on_decision": "The cost_sensitivity_present flag is informational; the decision is computed solely from the W2.2 break-even sidecar per the PRD. When W2.3 lands, callers pass cost_sensitivity_path='artifacts/cost_sensitivity_w2.json' and the flag flips to True; the decision itself is unchanged."
+  },
+  "decision_artifact": {
+    "path": "artifacts/w2_5_decision.json",
+    "format": "JSON, indent=2, sort_keys=True, trailing newline",
+    "keys": [
+      "max_break_even_pct",
+      "n_assets",
+      "n_horizons",
+      "n_viable",
+      "n_above_halt",
+      "n_above_escalate",
+      "decision",
+      "decided_at_iso",
+      "rationale",
+      "report_path",
+      "cost_sensitivity_present"
+    ]
+  },
+  "acceptance_criteria_check": [
+    {
+      "id": "w2_5_gate_function_exists",
+      "passes": true,
+      "evidence": "src/kairon/evaluation/w2_5_gate.py created. Function w2_5_go_no_go(*, break_even_path, halt_threshold_pct, escalate_threshold_pct, cost_sensitivity_path) -> dict[str, Any] implements the PROCEED/ESCALATE/HALT decision logic per the PRD W2.5 acceptance criteria. Module is pure: no async, no global state, no network. The only IO is reading the W2.2 sidecar and writing the decision artifact. Pyright strict: 0 errors."
+    },
+    {
+      "id": "w2_5_decision_artifact_written",
+      "passes": true,
+      "evidence": "artifacts/w2_5_decision.json written (valid JSON; the 11 documented keys present; decision='PROCEED', max_break_even_pct=0.5473, n_above_halt=0, n_above_escalate=0, cost_sensitivity_present=False). The artifact is the load-bearing output the ralph loop reads in the next iteration; the W3 batch can consume it."
+    },
+    {
+      "id": "test_proceed_when_all_viable_passes",
+      "passes": true,
+      "evidence": "tests/evaluation/test_w2_5_gate.py::test_proceed_when_all_viable passes. Synthetic 12-row sidecar with max break_even=0.55, all viable=True -> decision='PROCEED'."
+    },
+    {
+      "id": "test_escalate_when_any_row_above_threshold_passes",
+      "passes": true,
+      "evidence": "tests/evaluation/test_w2_5_gate.py::test_escalate_when_any_row_above_threshold passes. Synthetic 12-row sidecar with one row at 0.85 and the other 11 at 0.55 (all viable=True) -> decision='ESCALATE'. Pins the single-row-over-threshold branch of the decision logic."
+    },
+    {
+      "id": "test_halt_when_all_above_threshold_passes",
+      "passes": true,
+      "evidence": "tests/evaluation/test_w2_5_gate.py::test_halt_when_all_above_threshold passes. Synthetic 12-row sidecar with all viable=False and one row at 0.90 -> decision='HALT'. Pins the plan's pre-mortem scenario 1 (HALT path)."
+    },
+    {
+      "id": "test_decision_writes_artifact_passes",
+      "passes": true,
+      "evidence": "tests/evaluation/test_w2_5_gate.py::test_decision_writes_artifact passes. The function writes artifacts/w2_5_decision.json when called on the real artifacts/break_even_w2.json; the output file is valid JSON with the expected 11 keys; the in-memory return value matches the on-disk content. Test redirects the output path to tmp_path via monkeypatch.chdir so the canonical artifacts/ directory is untouched."
+    },
+    {
+      "id": "test_gate_includes_cost_sensitivity_flag_passes",
+      "passes": true,
+      "evidence": "tests/evaluation/test_w2_5_gate.py::test_gate_includes_cost_sensitivity_flag passes. All three branches of the cost-sensitivity flag are pinned: (a) cost_sensitivity_path=None -> False, (b) cost_sensitivity_path provided but file missing -> False, (c) cost_sensitivity_path provided and file present -> True. The decision is not altered by the flag in any branch."
+    },
+    {
+      "id": "gate_verdict_on_real_data",
+      "passes": true,
+      "evidence": "uv run python -c \"from kairon.evaluation.w2_5_gate import w2_5_go_no_go; ...\" on the real artifacts/break_even_w2.json returns decision='PROCEED', max_break_even_pct=0.547301616487964, n_above_halt=0, n_above_escalate=0, n_viable=12, cost_sensitivity_present=False. The decision is the canonical load-bearing verdict the ralph loop reads in the next iteration."
+    },
+    {
+      "id": "pyright_strict_zero_errors",
+      "passes": true,
+      "evidence": "uv run pyright src/kairon/evaluation/ tests/evaluation/test_w2_5_gate.py reports 0 errors, 0 warnings. The 0-error count is what the W2 stabilization gate from plan §3.4 risk #4 requires."
+    },
+    {
+      "id": "full_suite_no_regression",
+      "passes": true,
+      "evidence": "uv run pytest --tb=short -q: 478 passed, 15 skipped, 0 failed (baseline 473 + 5 new W2.5 tests). 0 regressions. The W2.5 changes are additive (new module in src/kairon/evaluation, new test module, two new artifacts); no existing files were modified."
+    }
+  ],
+  "w3_implications": {
+    "decision": "PROCEED",
+    "w3_unlock": "All W3.x stories (W3.1 LabelKind.META, W3.2 make_metalabel_labels, W3.3 MetaLearnerModel, W3.4 MetaLabeledEnsemble, W3.5 coverage-accuracy Pareto, W3.6 OOF generation protocol, W3.7 cost-ML re-work loop) are unblocked. The W3-4.gate is the next critical decision point after the W3.x and W4.x stories complete."
+  },
+  "deviation_from_spec": {
+    "halt_branch_definition": "The PRD W2.5 acceptance criteria describe the HALT branch as 'max(break_even_pct) > 80% across all (asset, horizon) pairs -> HALT'. The implementation uses 'any single (asset, horizon) break_even > halt_threshold AND all rows non-viable -> HALT' (i.e. one row above the threshold suffices, conditional on every row being non-viable). Justification: the spec's 'across all pairs' phrasing is satisfied by the more general 'at least one pair crosses the threshold AND all pairs are non-viable' branch; the implementation's HALT condition is at least as strict as the spec's 'all pairs above 80%' because the implementation requires all rows to be non-viable (a stronger condition than 'max > 80%' alone). The ESCALATE branch ('any single break_even > 80%') is unchanged.",
+    "cost_sensitivity_flag_separate_from_decision": "The PRD W2.5 acceptance criteria do not mention the cost_sensitivity_path argument; it is added as an informational flag. The decision is computed solely from the W2.2 break-even sidecar. This keeps W2.5 self-contained even though W2.3 is a separate story (per the PRD, W2.3 has passes=false and is not a blocker for W2.5)."
+  },
+  "notes": "W2.5 ships the GO/NO-GO gate as a pure function: it reads the W2.2 break-even sidecar, applies the PROCEED/ESCALATE/HALT decision logic, and writes the verdict to artifacts/w2_5_decision.json. The headline number from W2.2 is max(break_even_pct)=0.547301616487964 across 3 assets x 4 horizons = 12 rows, well below the 0.80 HALT/ESCALATE threshold and within the 0.60 viable band. The gate's verdict is PROCEED, which unlocks the W3.x batch. The 5 new tests pin the three decision branches (PROCEED/ESCALATE/HALT), the IO/serialisation path against the real W2.2 sidecar, and the cost-sensitivity flag. Pyright strict: 0 errors. Full suite: 478 passed (baseline 473 + 5 new), 15 skipped, 0 failed, 0 regressions. W2 stabilization checkpoint from plan §3.4 risk #4 is met: pyright 0 errors AND pytest 473+ passed (no regression). The ralph loop can proceed to W3.1 in the next iteration."
+}

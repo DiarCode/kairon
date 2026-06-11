@@ -1,0 +1,48 @@
+{
+  "schema_version": "1",
+  "story_id": "W2.3",
+  "decided_at_iso": "2026-06-07",
+  "base_round_trip_bps": 28.0,
+  "bars_per_year": 8760,
+  "n_trades": 720,
+  "multipliers": [
+    0.5,
+    1.0,
+    2.0,
+    5.0
+  ],
+  "rows": [
+    {
+      "multiplier": 0.5,
+      "sharpe": -1312.6783071145078,
+      "sortino": -1312.6783071145078,
+      "max_dd": -0.6283253344973271,
+      "total_return": -0.6283253344973271,
+      "n_trades": 720
+    },
+    {
+      "multiplier": 1.0,
+      "sharpe": -2650.503273142843,
+      "sortino": -2650.503273142843,
+      "max_dd": -0.8646418642248366,
+      "total_return": -0.8646418642248366,
+      "n_trades": 720
+    },
+    {
+      "multiplier": 2.0,
+      "sharpe": -5326.153205199619,
+      "sortino": -5326.153205199619,
+      "max_dd": -0.9821237439145791,
+      "total_return": -0.9821237439145791,
+      "n_trades": 720
+    },
+    {
+      "multiplier": 5.0,
+      "sharpe": -13353.10300136977,
+      "sortino": -13353.10300136977,
+      "max_dd": -0.9999602147091251,
+      "total_return": -0.9999602147091252,
+      "n_trades": 720
+    }
+  ]
+}

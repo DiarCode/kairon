@@ -1,0 +1,36 @@
+{
+  "schema_version": "1",
+  "story_id": "W6.3",
+  "decided_at_iso": "2026-06-08T09:12:54Z",
+  "w6_fallback": false,
+  "w6_fallback_decision": null,
+  "dominates": false,
+  "ttest_pvalue": 0.39622632225055715,
+  "n_dominating_assets": 2,
+  "n_assets": 3,
+  "assets": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT"
+  ],
+  "rows": [
+    {
+      "asset": "BTCUSDT",
+      "primary_cas": -40.989178191208424,
+      "stacked_cas": -40.420429812289,
+      "stacked_dominates": true
+    },
+    {
+      "asset": "ETHUSDT",
+      "primary_cas": -33.61636351113383,
+      "stacked_cas": -33.42665886696181,
+      "stacked_dominates": true
+    },
+    {
+      "asset": "SOLUSDT",
+      "primary_cas": -24.048469544531546,
+      "stacked_cas": -24.16766119173057,
+      "stacked_dominates": false
+    }
+  ]
+}

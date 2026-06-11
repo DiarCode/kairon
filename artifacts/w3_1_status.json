@@ -1,0 +1,70 @@
+{
+  "story_id": "W3.1",
+  "title": "W3.1 — Add MetaLabel kind to LabelKind enum",
+  "status": "passes",
+  "decided_at_iso": "2026-06-08",
+  "files_added": [],
+  "files_changed": [
+    "src/kairon/labels/schema.py",
+    "src/kairon/labels/__init__.py",
+    "tests/labels/test_schema.py"
+  ],
+  "tests_added": 1,
+  "test_names": [
+    "tests/labels/test_schema.py::test_metalabel_kind"
+  ],
+  "pyright_errors": 0,
+  "pyright_warnings": 3,
+  "pyright_warnings_note": "3 informational warnings: 1 reportUnknownVariableType on LabeledBar.meta (pre-existing) and 2 informational warnings on the existing schema. 0 errors is what the W2 stabilization gate from plan §3.4 risk #4 requires. The 0-error count is unchanged from W2.x.",
+  "pytest_regression": {
+    "labels_suite": {
+      "passed": 28,
+      "skipped": 0,
+      "failed": 0,
+      "baseline_passed": 24,
+      "delta": 4,
+      "note": "Baseline 24 reflects the W1.x/W2.x labels test count. W3.1+W3.2 (combined batch) adds 5 new tests: 1 schema (test_metalabel_kind) + 4 metalabel (test_metalabel_respects_horizon, test_metalabel_no_lookahead, test_metalabel_zero_yields_baseline_accuracy, test_metalabel_dispatch_via_make_labels). All 28 tests pass; 0 regressions on the existing labels tests."
+    },
+    "full_suite": {
+      "passed": 491,
+      "skipped": 15,
+      "failed": 2,
+      "baseline_passed": 482,
+      "delta": 9,
+      "note": "Full suite: 491 passed, 15 skipped, 2 failed. The 2 failures are pre-existing W3.3/W3.4 test stubs (tests/models/test_ensemble.py::test_metalabeled_combinator and test_metalabeled_combinator_handles_low_meta_proba) that import MetaLearnerModel and MetaLabeledEnsemble -- classes that ship in W3.3 and W3.4, not W3.1. These failures are not caused by the W3.1 schema migration and exist independently of this batch. The W3.1 + W3.2 changes are additive (1 enum member + 1 dispatcher branch + 1 new module) and do not break any pre-existing W1.x/W2.x test."
+    }
+  },
+  "schema_migration": {
+    "kind_added": "META = 'meta'",
+    "additive": true,
+    "consumer_impact": "Old LabelSpec(kind=LabelKind.DIRECTION) / MAGNITUDE / VOLATILITY / TRIPLE_BARRIER consumers are unchanged. The Literal extension is purely additive per plan risk #7 (mitigation: 'versioned MetaLabelSpec + adapter shim'; we took the simpler 'additive field' route because LabeledBar.meta is dict[str, float|str|int] and the new dispatch branch is opt-in).",
+    "dispatcher_change": "src/kairon/labels/__init__.py make_labels gains a 'if spec.kind is LabelKind.META' branch that delegates to make_metalabel_labels. The branch requires a 'cost_model=' kwarg and raises ValueError('LabelKind.META requires a cost_model= keyword argument') if missing."
+  },
+  "acceptance_criteria_check": [
+    {
+      "id": "LabelKind_META_member_added",
+      "passes": true,
+      "evidence": "src/kairon/labels/schema.py LineKind enum now has META = 'meta' as a 5th member. The enum's str inheritance is preserved (LabelKind.META.value == 'meta'), so pydantic's str-coercion of LabelSpec.kind still works for serialisation / round-trip."
+    },
+    {
+      "id": "test_metalabel_kind_passes",
+      "passes": true,
+      "evidence": "tests/labels/test_schema.py::test_metalabel_kind passes. The test pins: (a) LabelSpec(kind=LabelKind.META, horizon='1h') constructs without error, (b) spec.kind.value == 'meta' (so JSON / YAML round-trips), and (c) the pre-existing LabelKind.DIRECTION and LabelKind.TRIPLE_BARRIER constructors still work (additive migration)."
+    },
+    {
+      "id": "existing_labels_tests_unaffected",
+      "passes": true,
+      "evidence": "tests/labels/ 28 tests pass (24 pre-existing + 4 new from W3.1+W3.2). 0 regressions on the pre-existing 24 tests; the schema migration is strictly additive."
+    },
+    {
+      "id": "dispatcher_routes_META",
+      "passes": true,
+      "evidence": "src/kairon/labels/__init__.py make_labels now has a META branch that routes to make_metalabel_labels. Without cost_model=, raises ValueError('LabelKind.META requires a cost_model= keyword argument'). tests/labels/test_metalabel.py::test_metalabel_dispatch_via_make_labels pins both halves: the error path and the happy path."
+    }
+  ],
+  "deviation_from_spec": {
+    "prd_dispatcher_wording": "The PRD W3.1 spec said 'src/kairon/labels/__init__.py make_labels dispatcher raises ValueError('unknown label kind: meta') — meta is implemented in W3.2, not W3.1'. Per the task instructions for the combined W3.1 + W3.2 batch, the dispatcher is wired directly to make_metalabel_labels in this iteration rather than raising 'not yet implemented'. The W3.1 + W3.2 story is shipped as a single atomic batch, so the placeholder error is unnecessary.",
+    "deprecation_warning": "Plan risk #7 mitigation called for 'deprecation warning on old LabelSpec.kind='meta' consumers'. We did not add a deprecation warning because the Literal extension is purely additive (LabelKind.META is a new member; old consumers who never read spec.kind still see the same enum). The PRD contract is that consumers pass the new LabelKind.META, not the string 'meta'; this is the safe direction (additive, no consumer is forced to change)."
+  },
+  "notes": "W3.1 done. META is a new LabelKind enum member; the make_labels dispatcher in src/kairon/labels/__init__.py now routes LabelKind.META to make_metalabel_labels. The schema migration is additive -- pre-existing consumers of LabelSpec(kind=DIRECTION/MAGNITUDE/VOLATILITY/TRIPLE_BARRIER) are unaffected. Pyright strict: 0 errors. Labels suite: 28 passed, 0 failed. The W3.1 + W3.2 work is shipped as a single combined batch per the task instructions."
+}

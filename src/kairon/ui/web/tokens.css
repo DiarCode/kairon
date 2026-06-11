@@ -1,0 +1,60 @@
+/* Kairon design tokens — single source of truth for the visual language.
+   No hardcoded colors / fonts / radii anywhere else in the web tree. */
+
+:root {
+    /* surfaces */
+    --bg: #0A0B0E;
+    --glass-bg: rgba(255, 255, 255, 0.04);
+    --glass-border: rgba(255, 255, 255, 0.08);
+
+    /* type */
+    --text: #F4F4F5;
+    --text-muted: #A1A1AA;
+    --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+    /* accent + status */
+    --accent: #3B82F6;            /* blue-500 */
+    --negative: #EF4444;          /* desaturated red — NEVER green */
+    --pending: #A1A1AA;
+
+    /* shape — strict, no rounding */
+    --radius: 0;
+
+    /* motion */
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --dur-fast: 120ms;
+    --dur: 200ms;
+}
+
+* {
+    box-sizing: border-box;
+    border-radius: var(--radius);
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+body {
+    /* earth background is set in layout.html as a fixed full-screen img */
+    background-color: var(--bg);
+    overflow-x: hidden;
+}
+
+a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+button {
+    font-family: var(--font-ui);
+}

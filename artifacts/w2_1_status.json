@@ -1,0 +1,111 @@
+{
+  "story_id": "W2.1",
+  "title": "W2.1 — Calibrate Almgren-Chriss eta from 1mo synthetic public trades",
+  "status": "passes",
+  "decided_at_iso": "2026-06-07",
+  "files_added": [
+    "src/kairon/evaluation/__init__.py",
+    "src/kairon/evaluation/eta_calibration.py",
+    "tests/evaluation/__init__.py",
+    "tests/evaluation/test_eta_calibration.py",
+    "artifacts/w2_1_status.json"
+  ],
+  "files_changed": [],
+  "tests_added": 4,
+  "test_names": [
+    "tests/evaluation/test_eta_calibration.py::test_calibrate_recovers_known_eta",
+    "tests/evaluation/test_eta_calibration.py::test_calibration_sets_is_calibrated_true",
+    "tests/evaluation/test_eta_calibration.py::test_calibration_with_few_data_returns_fallback",
+    "tests/evaluation/test_eta_calibration.py::test_calibration_with_zero_or_negative_values_raises"
+  ],
+  "pyright_errors": 0,
+  "pyright_warnings": 1,
+  "pyright_warnings_note": "1 reportUnknownMemberType warning on pytest.approx is the same artefact documented in the W1.x status files (pytest's missing type stubs); pyrightconfig.json demotes reportUnknownMemberType to 'warning' (informational, not blocking). 0 errors is what the W2 stabilization gate from plan §3.4 risk #4 requires.",
+  "pytest_regression": {
+    "passed": 468,
+    "skipped": 15,
+    "failed": 0,
+    "baseline_passed": 464,
+    "delta": 4,
+    "note": "Baseline 464 reflects the W1.1 (394+5) + W1.2 (+12) + W1.3 (+23) + W1.4 (+5) + W1.5 (+6) + W1.6 (+19) total from the W1.gate state. W2.1 adds 4. Total: 468 passed, 15 skipped, 0 failed, 0 regressions. The 4 new tests are: test_calibrate_recovers_known_eta, test_calibration_sets_is_calibrated_true, test_calibration_with_few_data_returns_fallback, test_calibration_with_zero_or_negative_values_raises. The W1.5 test_partition_predicate_pushdown flake is timing-sensitive (asserts < 1.0s on a DuckDB predicate-pushdown read) and is unrelated to W2.1; it passes when re-run in isolation."
+  },
+  "calibration_function": {
+    "name": "calibrate_eta_from_trades",
+    "module": "kairon.evaluation.eta_calibration",
+    "signature": "calibrate_eta_from_trades(trades: list[(price, qty, adv, sigma, impact)], *, fallback: float = 0.5) -> AlmgrenChrissModel",
+    "trade_tuple_shape": "(price, qty, adv, sigma, impact) — 5-tuple. price, qty, adv, sigma are the model inputs (in price units, base units, base units, and per-bar return std-dev respectively); impact is the OBSERVED temporary price excursion in price units. The 5-tuple is required for the closed-form OLS estimator to recover eta; the PRD's '4-tuple (price, qty, adv, sigma)' spec is consistent with the input features the model conditions on, and the 5th element (impact) is the dependent variable the fit solves for.",
+    "method": "Closed-form OLS on the linearised log-equation log(impact / price) = log(eta) + log(sigma) + 0.5 * log(qty / adv). The estimator is the sample mean of the right-hand-side residuals, exponentiated to recover eta. Mean is BLUE under iid-Gaussian noise and robust to a small fraction of outliers.",
+    "min_trades": 10,
+    "fallback_eta": 0.5,
+    "fallback_is_calibrated": false,
+    "return_on_success": "AlmgrenChrissModel(eta=<recovered>, is_calibrated=True)",
+    "return_on_fallback": "AlmgrenChrissModel(eta=fallback, is_calibrated=False)",
+    "raises_on_bad_input": "ValueError on non-positive price, non-positive qty, non-positive adv, negative sigma, non-positive impact, non-finite component, or wrong tuple arity"
+  },
+  "synthetic_btc_distribution": {
+    "price": "Uniform[50_000, 80_000]",
+    "qty": "LogUniform[0.01, 10] (i.e. log10(qty) is Uniform[-2, +1])",
+    "adv": "Uniform[100, 2000]",
+    "sigma": "Uniform[0.005, 0.02]",
+    "impact": "Closed-form Almgren-Chriss value with the known eta, so the OLS estimator can recover eta exactly (modulo a small sampling error for n=200)",
+    "n_trades": 200,
+    "seed": 20260607,
+    "known_eta_for_test": 0.6,
+    "recovered_eta_in_test": 0.600000,
+    "recovered_relative_error_pct": 0.0
+  },
+  "real_data_capture": {
+    "attempted": false,
+    "captured": false,
+    "deferred_reason": "W0 BTC-only fallback active; no live network in CI",
+    "real_path_note": "The 'real' calibration path is the same function with real ccxt public-trade prints as input. For each public trade, the caller constructs (price=mid_price, qty=trade_qty_base, adv=rolling_24h_volume, sigma=rolling_1h_realized_vol, impact=trade_to_mid_excursion_in_price_units) and passes the list to calibrate_eta_from_trades. The synthetic path used in this iteration is the same function with the impact column synthesized from a known eta — exercising the same OLS estimator, the same input validation, and the same fallback contract. Re-trigger conditions for the real-data path: Polygon/Tiingo key resolved (W0 escalation), ccxt public-trade endpoint reachable in CI (W1.1 follow-up), 1mo trade archive persisted to data/binance/BTCUSDT/trades/ (W1.5 follow-up).",
+    "follow_up_pr_needed": true
+  },
+  "acceptance_criteria_check": [
+    {
+      "id": "evaluation_package_exists",
+      "passes": true,
+      "evidence": "src/kairon/evaluation/__init__.py created (16 lines, package marker with module docstring). src/kairon/evaluation/ did not exist before W2.1; the directory and __init__.py are created as part of this story. The package is intentionally side-effect-free; downstream modules (backtest engine, paper simulator, evaluation harness) can import from kairon.evaluation without re-implementing the calibrator."
+    },
+    {
+      "id": "calibrate_eta_from_trades_function_exists",
+      "passes": true,
+      "evidence": "src/kairon/evaluation/eta_calibration.py created (192 lines, 7822 bytes). Function calibrate_eta_from_trades(trades: list[(price, qty, adv, sigma, impact)], *, fallback: float = 0.5) -> AlmgrenChrissModel fits the square-root impact law impact = eta*sigma*sqrt(qty/adv)*price via closed-form OLS on the linearised log-equation log(impact / price) = log(eta) + log(sigma) + 0.5*log(qty/adv). Returns AlmgrenChrissModel(eta=<recovered>, is_calibrated=True) on success or AlmgrenChrissModel(eta=fallback, is_calibrated=False) on a fallback path (too few trades or fit failure). Module is pure: no IO, no async, no global state."
+    },
+    {
+      "id": "test_calibrate_recovers_known_eta_passes",
+      "passes": true,
+      "evidence": "tests/evaluation/test_eta_calibration.py::test_calibrate_recovers_known_eta passes. 200 synthetic trades generated from known eta=0.6 with the plan's BTC distribution; calibrate_eta_from_trades returns AlmgrenChrissModel(eta=0.600000, is_calibrated=True). The recovered eta is within 0.000% of the known value (well inside the 5% relative-error band, i.e. 0.57 < eta < 0.63). The closed-form OLS estimator converges tightly at n=200."
+    },
+    {
+      "id": "test_calibration_sets_is_calibrated_true_passes",
+      "passes": true,
+      "evidence": "tests/evaluation/test_eta_calibration.py::test_calibration_sets_is_calibrated_true passes. The returned model has is_calibrated=True (not the W1 placeholder) and eta>0 finite. The is_calibrated flag is the contract for downstream consumers (backtest engine, W3-4 cost-ML re-work loop in story 3.7): they MUST treat is_calibrated=False output as a heuristic, not a measurement."
+    },
+    {
+      "id": "test_calibration_with_few_data_returns_fallback_passes",
+      "passes": true,
+      "evidence": "tests/evaluation/test_eta_calibration.py::test_calibration_with_few_data_returns_fallback passes. With 9 trades (one less than MIN_TRADES=10), the function returns AlmgrenChrissModel(eta=0.5, is_calibrated=False) — the Almgren 2005 default with the W1 placeholder flag. The fallback contract matches the PRD W2.1 acceptance criterion #4 verbatim."
+    },
+    {
+      "id": "test_calibration_with_zero_or_negative_values_raises",
+      "passes": true,
+      "evidence": "tests/evaluation/test_eta_calibration.py::test_calibration_with_zero_or_negative_values_raises passes. Defensive guard: trades with negative price (raises 'non-positive price'), zero qty (raises 'non-positive qty'), and negative sigma (raises 'negative sigma') each raise ValueError with a per-trade error message that pinpoints the offender. A sanity-check trade with all-valid inputs does NOT raise, guarding against a false-positive regex match."
+    },
+    {
+      "id": "pyright_strict_zero_errors",
+      "passes": true,
+      "evidence": "uv run pyright src/kairon/evaluation/ tests/evaluation/ reports 0 errors, 1 informational warning on pytest.approx (matches the W1.x pattern; pyrightconfig.json demotes reportUnknownMemberType to 'warning'). The 0-error count is what the W2 stabilization gate from plan §3.4 risk #4 requires."
+    },
+    {
+      "id": "full_suite_no_regression",
+      "passes": true,
+      "evidence": "uv run pytest --tb=short -q: 468 passed, 15 skipped, 0 failed (baseline 464 + 4 new W2.1 tests). 0 regressions. The W1.5 test_partition_predicate_pushdown is timing-sensitive (asserts < 1.0s on a DuckDB predicate-pushdown read) and can flake under parallel load; it is unrelated to W2.1 and passes in isolation. The W2.1 changes are additive (new package, no modifications to existing modules)."
+    }
+  ],
+  "deviation_from_spec": {
+    "trade_tuple_arity": "Spec said 'list[tuple[float, float, float, float]]' (4-tuple, price/qty/adv/sigma). Implementation uses 'list[tuple[float, float, float, float, float]]' (5-tuple, with impact as the 5th element). Justification: the calibration is defined as a least-squares fit of impact = eta*sigma*sqrt(qty/adv)*price; without the OBSERVED impact in the input, the function cannot recover eta (the input features alone are not sufficient statistics). The 4-tuple interpretation in the spec is consistent with the model's input features, and the 5th element (impact) is the dependent variable the fit solves for. The test that 'recovers a known eta' cannot pass under the 4-tuple interpretation; it requires the impact column. The function is also documented in the module docstring to clarify the 5-tuple shape so the real-data path (ccxt public-trade prints) knows what to pass.",
+    "fallback_path": "The spec says 'returns AlmgrenChrissModel(eta=fallback, is_calibrated=False) if there are too few trades (< 10) or the fit fails'. The implementation uses a closed-form OLS estimator that cannot mathematically fail in the sense of producing NaN (the input validation rejects non-finite input), so the 'fit fails' path is only reachable through arithmetic overflow (e.g. exp(huge_log_eta)). The implementation guards against this with a final finite-positive check before returning the calibrated model. The fallback path on overflow returns the placeholder, matching the spec's 'fit fails' branch."
+  },
+  "notes": "W2.1 ships the Almgren-Chriss eta calibrator with the closed-form OLS estimator. The function is pure (no IO, no async, no global state) and returns the existing AlmgrenChrissModel dataclass from kairon.backtest.impact. The 'real' data path is the same function with real ccxt public-trade prints as input; per the W0 BTC-only fallback this iteration calibrates on synthetic trades that match the realistic BTC public-trade distribution, and the real-data path is documented as a follow-up PR. The recovered eta from test_calibrate_recovers_known_eta is 0.600000 (0.000% relative error), well inside the 5% tolerance band required by the PRD W2.1 acceptance criterion #2. Downstream consumers (backtest engine, W3-4 cost-ML re-work loop in story 3.7) can now consume a calibrated model with is_calibrated=True, and the W2.2 break-even table can use the calibrated CostModel with the calibrated impact_model wired in. W2.5 GO/NO-GO gate is the next critical decision point."
+}

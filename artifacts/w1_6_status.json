@@ -1,0 +1,118 @@
+{
+  "story_id": "W1.6",
+  "title": "Real-data leakage fixture (shared module)",
+  "status": "passes",
+  "decided_at_iso": "2026-06-07",
+  "files_changed": [
+    "tests/fixtures/__init__.py",
+    "tests/fixtures/leakage.py",
+    "tests/fixtures/test_leakage_fixture.py"
+  ],
+  "tests_added": 19,
+  "test_names": [
+    "tests/fixtures/test_leakage_fixture.py::test_fixture_conforms_to_ohlcv_schema",
+    "tests/fixtures/test_leakage_fixture.py::test_fixture_is_deterministic_for_same_seed",
+    "tests/fixtures/test_leakage_fixture.py::test_fixture_different_seeds_yield_different_walks",
+    "tests/fixtures/test_leakage_fixture.py::test_fixture_timestamps_are_in_the_past",
+    "tests/fixtures/test_leakage_fixture.py::test_fixture_rejects_zero_n_bars",
+    "tests/fixtures/test_leakage_fixture.py::test_fixture_rejects_zero_every_seconds",
+    "tests/fixtures/test_leakage_fixture.py::test_fixture_rejects_negative_sigma",
+    "tests/fixtures/test_leakage_fixture.py::test_assert_no_leakage_detects_planted_leak_short_fixture_long_horizon",
+    "tests/fixtures/test_leakage_fixture.py::test_assert_no_leakage_passes_when_horizon_fits_fixture",
+    "tests/fixtures/test_leakage_fixture.py::test_assert_no_leakage_passes_when_horizon_equals_fixture_length",
+    "tests/fixtures/test_leakage_fixture.py::test_assert_no_leakage_rejects_empty_table",
+    "tests/fixtures/test_leakage_fixture.py::test_assert_no_leakage_rejects_wrong_schema",
+    "tests/fixtures/test_leakage_fixture.py::test_assert_no_leakage_rejects_non_positive_horizon",
+    "tests/fixtures/test_leakage_fixture.py::test_assert_timestamp_monotonic_passes_on_clean_fixture",
+    "tests/fixtures/test_leakage_fixture.py::test_assert_timestamp_monotonic_detects_duplicate_row",
+    "tests/fixtures/test_leakage_fixture.py::test_assert_timestamp_monotonic_detects_future_timestamp",
+    "tests/fixtures/test_leakage_fixture.py::test_assert_timestamp_monotonic_rejects_empty_table",
+    "tests/fixtures/test_leakage_fixture.py::test_assert_timestamp_monotonic_rejects_wrong_schema",
+    "tests/fixtures/test_leakage_fixture.py::test_downstream_can_import_helpers_from_package"
+  ],
+  "pyright_errors": 0,
+  "pyright_warnings": 5,
+  "pyright_warnings_note": "All informational; pytest.approx has partially-unknown type signature (5 sites). pyrightconfig.json demotes these to warnings. Matches the pre-existing pattern in tests/data/test_partitioning.py and elsewhere in the test suite.",
+  "pytest_regression": {
+    "passed": 464,
+    "skipped": 15,
+    "failed": 0,
+    "baseline_passed": 445,
+    "delta": 19
+  },
+  "fixture_api": {
+    "module": "tests.fixtures.leakage",
+    "exports": [
+      {
+        "name": "real_history_fixture",
+        "signature": "(*, n_bars: int = 1440, start: datetime | None = None, every_seconds: int = 60, base_price: float = 50000.0, sigma: float = 0.01, seed: int = 42) -> pa.Table",
+        "behaviour": "Returns an OHLCV_SCHEMA-conformant pyarrow table of synthetic BTC-like 1m bars; deterministic for a given seed. Default start is 1 day before now (so default fixture is fully in the past).",
+        "determinism_test": "test_fixture_is_deterministic_for_same_seed (also asserts the walk differs for different seeds)"
+      },
+      {
+        "name": "assert_no_leakage",
+        "signature": "(table: pa.Table, *, label_horizon_seconds: int) -> None",
+        "behaviour": "Raises AssertionError if (max(ts) - min(ts)).total_seconds() < label_horizon_seconds, or if schema is not OHLCV_SCHEMA, or if the table is empty. Planted-leak test: 10-bar 1m fixture with 86400s horizon MUST raise. Clean test: 10-bar 1m fixture with 60s horizon passes."
+      },
+      {
+        "name": "assert_timestamp_monotonic",
+        "signature": "(table: pa.Table, *, future_slack: timedelta = timedelta(minutes=5)) -> None",
+        "behaviour": "Raises AssertionError if any ts[i] < ts[i-1] (non-decreasing) or if max(ts) > now(UTC) + future_slack. Default slack is 5 minutes; pass timedelta(0) for strict no-future."
+      }
+    ],
+    "constants": {
+      "DEFAULT_N_BARS": 1440,
+      "DEFAULT_EVERY_SECONDS": 60,
+      "FUTURE_SLACK_DEFAULT": "timedelta(minutes=5)"
+    }
+  },
+  "deviation_from_spec": {
+    "spec_horizon_check": "Spec suggested 'len(table) * every_seconds >= label_horizon_seconds'",
+    "implemented_horizon_check": "(max(ts) - min(ts)).total_seconds() >= label_horizon_seconds",
+    "reason": "The spec's 'len * every_seconds' formula counts from bar 0 to bar n-1 inclusive, but a label at the very last bar with horizon=len*every_seconds would still need a bar past the table's end. The implemented check uses the actual ts span and is layout/cadence-neutral: it works for 1m, 5m, 1h, daily, or any custom cadence, and it does not require the helper to know the bar cadence. The test_planted_leak test (10-bar 1m, 86400s horizon -> raises) and the test_passes_when_horizon_fits_fixture (10-bar 1m, 60s horizon -> passes) both pass with the implemented formula. The boundary test was tightened from n_bars=100 every_seconds=1 horizon=100 to n_bars=101 every_seconds=1 horizon=100 so that span (100s) exactly equals horizon (100s)."
+  },
+  "non_duplication_note": "tests/splits/test_leakage_invariants.py is the splits-layer leakage test (fold ordering, purge/embargo index sets) and is unchanged. W1.6 is the bar-level OHLCV-table counterpart (single-table span + monotonicity) and lives at tests/fixtures/leakage.py so downstream test authors can import it without depending on the splits internals. The two layers are complementary, not duplicates.",
+  "fixture_size": {
+    "default_n_bars": 1440,
+    "default_every_seconds": 60,
+    "default_span_seconds": 86340,
+    "rationale": "1440 1m bars = 1 day of BTC 1m data; default span (86340s = 23h59m) supports label horizons up to ~24h. The helper is layout-neutral and does not depend on the W1.5 hive-style partition layout."
+  },
+  "acceptance_criteria_check": [
+    {
+      "id": "tests_fixtures_leakage_py_exports_factory_and_helpers",
+      "passes": true,
+      "evidence": "tests/fixtures/leakage.py exports real_history_fixture (factory returning OHLCV_SCHEMA-conformant pa.Table, deterministic via seed), assert_no_leakage(table, *, label_horizon_seconds), assert_timestamp_monotonic(table, *, future_slack)"
+    },
+    {
+      "id": "test_leakage_fixture_passes_planted_leak_and_clean_cases",
+      "passes": true,
+      "evidence": "test_assert_no_leakage_detects_planted_leak_short_fixture_long_horizon (10-bar 1m fixture, 86400s horizon -> AssertionError 'future-leakage detected') + test_assert_no_leakage_passes_when_horizon_fits_fixture (10-bar 1m, 60s horizon -> no raise) both pass; all 19 fixture tests pass under uv run pytest tests/fixtures/ -v"
+    },
+    {
+      "id": "downstream_imports_work",
+      "passes": true,
+      "evidence": "test_downstream_can_import_helpers_from_package exercises 'from tests.fixtures.leakage import ...' and asserts the symbols are the same module-level objects. tests/fixtures/__init__.py exists so the import path resolves."
+    },
+    {
+      "id": "schema_conformance",
+      "passes": true,
+      "evidence": "test_fixture_conforms_to_ohlcv_schema asserts 'table.schema == OHLCV_SCHEMA' (exact equality, not just compatibility)"
+    },
+    {
+      "id": "deterministic_with_seed",
+      "passes": true,
+      "evidence": "test_fixture_is_deterministic_for_same_seed: two calls with seed=1234 produce identical close values for every row; test_fixture_different_seeds_yield_different_walks: seeds 1 vs 2 produce different walks"
+    },
+    {
+      "id": "pyright_strict_passes",
+      "passes": true,
+      "evidence": "uv run pyright tests/fixtures/ reports 0 errors, 5 informational warnings (all pytest.approx, demoted per pyrightconfig.json)"
+    },
+    {
+      "id": "full_suite_no_regression",
+      "passes": true,
+      "evidence": "uv run pytest --tb=short -q: 464 passed (baseline 445 + 19 new), 15 skipped, 0 failed, 0 regressions"
+    }
+  ]
+}

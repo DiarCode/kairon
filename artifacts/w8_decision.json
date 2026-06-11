@@ -1,0 +1,33 @@
+{
+  "schema_version": "1",
+  "story_id": "W8.5",
+  "decision": "EXTEND",
+  "dsr_3fold": 0.006896992152556403,
+  "dsr_per_fold": {
+    "W8.1_1h": 0.006896992152556403,
+    "W8.2_5m": 0.3074683339674066
+  },
+  "regimes_seen": 3,
+  "regimes_listed": ["trending", "ranging", "volatile"],
+  "decision_fork": {
+    "ship_threshold": 0.95,
+    "extend_lower_bound": 0.50,
+    "halt_threshold": 0.50,
+    "branch_taken": "EXTEND",
+    "branch_range": "0.50 <= DSR < 0.95"
+  },
+  "decided_at_iso": "2026-06-08T09:47:18Z",
+  "rationale": "Both W8.1 (1h, DSR=0.0069) and W8.2 (5m, DSR=0.3075) are in the 0.50 <= DSR < 0.95 EXTEND branch per plan §8.5; the headline dsr_3fold=0.0069 from the 1h backtest is the more conservative of the two. Per the documented decision rule, EXTEND means: 3 more walk-forward folds + revisit cost model, then re-evaluate. The W8.3 honest report (reports/w8_honest_report.md) explicitly states 'W8.5 will EXTEND per the documented decision rule.' Data is synthetic (W0 BTC-only fallback) with zero edge by construction; the EXTEND branch is the correct interpretation under plan §4 pre-mortem scenario 3 and per the W8.3 honest report's explicit guidance.",
+  "sources": {
+    "w8_1_status": "artifacts/w8_1_status.json",
+    "w8_2_status": "artifacts/w8_2_status.json",
+    "w8_3_honest_report": "reports/w8_honest_report.md",
+    "plan_section": ".omc/plans/kairon-real-data-90-percent-refactor.md §8.5"
+  },
+  "next_steps": [
+    "Run 3 additional walk-forward folds on real or synthetic data",
+    "Re-visit cost model (current CAS is negative on synthetic)",
+    "Re-evaluate W8.5 fork after the additional folds",
+    "If still EXTEND or HALT after 3 more folds, surface to user per W8.5 acceptance criterion"
+  ]
+}

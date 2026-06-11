@@ -1,0 +1,59 @@
+{
+  "cells": [
+    {
+      "cell_key": "BTC_1h",
+      "symbol": "BTC",
+      "timeframe": "1h",
+      "accuracy": 0.4531205471644343,
+      "cas": -91.81792611903197,
+      "dsr": 0.421544152335898,
+      "pbo": 0.0,
+      "sharpe": 3.7413392197356763,
+      "max_dd": -0.1902167374351708,
+      "brier": 0.24275337513199216,
+      "ece": 0.025532005220171766,
+      "n_trades": 73,
+      "n_bars": 17544,
+      "be_acc": 0.7813943849591605,
+      "buy_and_hold_return": 0.08896121920915405,
+      "buy_and_hold_sharpe": 0.3242562335327991
+    },
+    {
+      "cell_key": "ETH_1h",
+      "symbol": "ETH",
+      "timeframe": "1h",
+      "accuracy": 0.4713593616414933,
+      "cas": -72.64561257009372,
+      "dsr": 0.44372851684675224,
+      "pbo": 0.0,
+      "sharpe": -15.338711231103273,
+      "max_dd": -0.012003826847368036,
+      "brier": 0.24618179985258767,
+      "ece": 0.03334683934293819,
+      "n_trades": 29,
+      "n_bars": 17544,
+      "be_acc": 0.6943854441506064,
+      "buy_and_hold_return": -0.4668092398018145,
+      "buy_and_hold_sharpe": -0.12939440852698023
+    },
+    {
+      "cell_key": "SOL_1h",
+      "symbol": "SOL",
+      "timeframe": "1h",
+      "accuracy": 0.45654032487888285,
+      "cas": -78.20116542982181,
+      "dsr": 0.0,
+      "pbo": 0.0,
+      "sharpe": NaN,
+      "max_dd": 0.0,
+      "brier": 0.25068273945497127,
+      "ece": 0.06413311306081831,
+      "n_trades": 1,
+      "n_bars": 17544,
+      "be_acc": 0.6615007947807706,
+      "buy_and_hold_return": -0.5056664867781976,
+      "buy_and_hold_sharpe": -0.027790031410437444
+    }
+  ],
+  "note": "1h cells only; 5m skipped due to simulation time"
+}

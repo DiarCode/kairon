@@ -1,0 +1,54 @@
+{
+  "schema_version": "1",
+  "story_id": "W8.2",
+  "decided_at_iso": "2026-06-10T07:22:58Z",
+  "symbol": "BTCUSDT",
+  "timeframe": "5m",
+  "data_source": "synthetic BTCUSDT 5m log-normal price walk (W0 BTC-only fallback; ccxt public-REST path is a 1-PR follow-up). n_bars=51840, sigma=0.0012, seed=20260608.",
+  "n_bars": 51840,
+  "n_features": 51831,
+  "n_trades": 14480,
+  "headline": {
+    "cas": -359.36520398047884,
+    "dsr": 0.3074683339674066,
+    "pbo": 0.0,
+    "sharpe": 27.57194995857205,
+    "max_drawdown": -0.016811803341345473,
+    "brier": 0.24996801513270994,
+    "ece": 0.000589047570533241,
+    "total_return": 1.2435781586788828,
+    "annualized_return": 351.8099852415177,
+    "annualized_vol": 0.21359806173150753,
+    "sortino": 36.732507095385145,
+    "calmar": 20926.368105693167,
+    "win_rate": 0.5796270718232044,
+    "profit_factor": 1.2498582403813152
+  },
+  "w7_simulator_integration": {
+    "fill_rate": 1.0,
+    "p50_latency_ms": 50.08267462489317,
+    "p99_latency_ms": 161.7067952532202,
+    "maker_rebate_bps": 0.0
+  },
+  "regime_breakdown": {
+    "trending": {
+      "n_bars": 16238.0,
+      "n_signals": 16232.0,
+      "hit_rate": 0.5247042878265156,
+      "avg_pnl_bps": 0.0
+    },
+    "ranging": {
+      "n_bars": 35571.0,
+      "n_signals": 35568.0,
+      "hit_rate": 0.5265969410706253,
+      "avg_pnl_bps": 0.0
+    },
+    "volatile": {
+      "n_bars": 31.0,
+      "n_signals": 31.0,
+      "hit_rate": 0.41935483870967744,
+      "avg_pnl_bps": 0.0
+    }
+  },
+  "w6_decision_used": "ship (stacked meta as component; W6.4 multi-head + W6.5 sizer as headline per W6 state)"
+}

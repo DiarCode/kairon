@@ -1,0 +1,42 @@
+{% extends "layout.html" %}
+{% block body %}
+<section class="kairon-glass-card kairon-screen">
+    <h1 class="kairon-screen-title">Result</h1>
+    <div class="kairon-bento" id="kairon-bento">
+        {% for tile in run.models %}
+        <div class="kairon-bento-tile kairon-model-tile" data-name="{{ tile.name }}">
+            <span class="kairon-horizon-pill kairon-horizon-pill--{{ tile.name }}">{{ tile.name }}</span>
+            <div class="kairon-big-number">
+                <span class="kairon-big-number-value">{{ '%.2f%%' % (tile.predicted_pct * 100) }}</span>
+            </div>
+            <dl class="kairon-tile-meta">
+                <dt>stop</dt><dd>{{ '%.2f' % tile.stop_loss }}</dd>
+                <dt>entry</dt><dd>{{ '%.2f' % tile.ideal_entry }}</dd>
+                <dt>exit</dt><dd>{{ '%.2f' % tile.ideal_exit }}</dd>
+                <dt>conf</dt><dd>{{ '%.0f%%' % (tile.confidence * 100) }}</dd>
+            </dl>
+        </div>
+        {% endfor %}
+    </div>
+    <div class="kairon-actions">
+        <button id="save-btn" type="button" class="kairon-primary-button" data-run-id="{{ run.run_id }}">Save</button>
+        <a class="kairon-text-link" href="/upload">New Analysis</a>
+    </div>
+    <a class="kairon-text-link" id="back-link" href="/analyze">back</a>
+    <script>
+        (function() {
+            const back = document.getElementById('back-link');
+            const ctx = '{{ back_target }}';
+            back.href = ctx === 'track' ? '/track' : '/analyze';
+            document.getElementById('save-btn').addEventListener('click', async function() {
+                const r = await fetch('/api/runs/{{ run.run_id }}/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pinned: true })
+                });
+                if (r.ok) this.textContent = 'Saved';
+            });
+        })();
+    </script>
+</section>
+{% endblock %}

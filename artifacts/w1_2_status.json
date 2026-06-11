@@ -1,0 +1,74 @@
+{
+  "story_id": "W1.2",
+  "title": "US-equity WebSocket feed stub (Polygon / Tiingo) — W0 BTC-only fallback active",
+  "status": "passes",
+  "decided_at_iso": "2026-06-07",
+  "files_changed": [
+    "src/kairon/data/adapters/us_equity_ws.py",
+    "tests/data/test_us_equity_ws.py"
+  ],
+  "files_added": [
+    "src/kairon/data/adapters/us_equity_ws.py",
+    "tests/data/test_us_equity_ws.py",
+    "artifacts/w1_2_status.json",
+    "reports/w1_2_stub_rationale.md"
+  ],
+  "tests_added": 12,
+  "test_names": [
+    "tests/data/test_us_equity_ws.py::test_equity_candle_round_trip",
+    "tests/data/test_us_equity_ws.py::test_watch_ohlcv_emits_no_rows_when_venue_is_tiingo",
+    "tests/data/test_us_equity_ws.py::test_watch_ohlcv_rejects_empty_symbol",
+    "tests/data/test_us_equity_ws.py::test_watch_ohlcv_rejects_empty_timeframe",
+    "tests/data/test_us_equity_ws.py::test_watch_ohlcv_rejects_none_callback",
+    "tests/data/test_us_equity_ws.py::test_is_implemented_is_literal_false",
+    "tests/data/test_us_equity_ws.py::test_venue_is_constrained_literal",
+    "tests/data/test_us_equity_ws.py::test_config_is_frozen_extra_forbid_strict",
+    "tests/data/test_us_equity_ws.py::test_name_is_stable",
+    "tests/data/test_us_equity_ws.py::test_fetch_returns_empty_ohlcv_table",
+    "tests/data/test_us_equity_ws.py::test_satisfies_market_data_adapter_protocol",
+    "tests/data/test_us_equity_ws.py::test_stub_does_no_network_work"
+  ],
+  "pyright_errors": 0,
+  "pyright_warnings": 0,
+  "pytest_regression": {
+    "passed": 411,
+    "skipped": 15,
+    "failed": 0,
+    "baseline_passed": 399,
+    "delta": 12,
+    "note": "Baseline 399 reflects the W1.1 +5 (394 baseline + 5 W1.1 tests). W1.2 adds 12. Total: 411 passed, 15 skipped, 0 failed, 0 regressions. Test names reflect the 1-PR stub and the 11 supporting contract tests."
+  },
+  "real_data_capture": {
+    "attempted": false,
+    "captured": false,
+    "note": "reports/w1_2_stub_rationale.md — W0 BTC-only fallback active (W0.1 unresolved: no Polygon or Tiingo API key). Stub emits one empty OHLCV_SCHEMA table per watch_ohlcv call and returns. Real-data capture is deferred to a future 1-PR change when the API key becomes available."
+  },
+  "acceptance_criteria_check": [
+    {
+      "id": "stub_file_exists",
+      "passes": true,
+      "evidence": "src/kairon/data/adapters/us_equity_ws.py created with class USEquityWebSocketFeed. Pydantic v2 model_config = ConfigDict(frozen=True, extra='forbid', strict=True) per AGENTS.md. Fields: venue: Literal['polygon', 'tiingo'], is_implemented: Literal[False] (stub marker). Methods: async aclose() (idempotent no-op), async watch_ohlcv(symbol, timeframe, callback) (calls callback with empty OHLCV_SCHEMA table once and returns), fetch() (returns empty OHLCV_SCHEMA table). Compile-checked against MarketDataAdapter protocol via _ensure_protocol() at module bottom (mirrors ccxt_adapter pattern at lines 195-201 / 274-280)."
+    },
+    {
+      "id": "test_equity_candle_round_trip_passes",
+      "passes": true,
+      "evidence": "tests/data/test_us_equity_ws.py::test_equity_candle_round_trip passes. Constructs USEquityWebSocketFeed(venue='polygon'), asserts is_implemented is False, calls await feed.watch_ohlcv('SPY', '1h', callback) with a list-collecting callback, asserts callback was called exactly once with a zero-row OHLCV_SCHEMA table, and asserts aclose() is idempotent (returns None on two consecutive calls). 11 supporting tests cover the rest of the contract (venue Literal constraint, frozen/strict/extra-forbid, REST shim, runtime MarketDataAdapter isinstance, defensive validation, hermeticity)."
+    },
+    {
+      "id": "stub_is_hermetic_no_network_no_key",
+      "passes": true,
+      "evidence": "Module imports with no third-party WebSocket dependency. Constructor takes only `venue` (Literal). test_stub_does_no_network_work guards against accidental network regression: the full subscribe + close cycle completes in <0.5s with no monkeypatch. No KAIRON_POLYGON_API_KEY or KAIRON_TIINGO_API_KEY is read at import or construct time."
+    },
+    {
+      "id": "w0_fallback_documented",
+      "passes": true,
+      "evidence": "reports/w1_2_stub_rationale.md explains the BTC-only fallback decision (per reports/w0_fallback.md §W0.1), enumerates the 5 implementation prerequisites (API key, WebSocket client, per-venue message parser, rate-limit/reconnection policy, real-data capture script), and documents the re-trigger conditions. The future PR is intentionally a 1-PR change so it does not gate the W1 ship."
+    },
+    {
+      "id": "real_data_capture_or_documented",
+      "passes": true,
+      "evidence": "Real-data capture deferred per W0 BTC-only fallback. Stub satisfies the 'documented as deferred' clause of acceptance criterion #1 of the W1.2 PRD entry. No regression in the pre-existing 394 baseline tests (verified via uv run pytest --tb=short -q: 411 passed = 394 baseline + 5 W1.1 + 12 W1.2, 15 skipped, 0 failed, 0 regressions)."
+    }
+  ],
+  "notes": "W1.2 ships as a typed stub per W0.1 (Polygon/Tiingo API key not yet provided). The class is fully pydantic-strict, satisfies the MarketDataAdapter protocol, and exposes the streaming watch_ohlcv contract used by live feeds. When the API key is provided, the future PR replaces the stub's watch_ohlcv body with a real WebSocket loop and re-adds SPY/AAPL to W8 (per reports/w0_fallback.md §'Re-trigger conditions')."
+}

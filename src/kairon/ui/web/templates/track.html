@@ -1,0 +1,43 @@
+{% extends "layout.html" %}
+{% block body %}
+<section class="kairon-glass-card kairon-screen">
+    <h1 class="kairon-screen-title">Track</h1>
+    <table class="kairon-track-table">
+        <thead>
+            <tr>
+                <th>asset</th>
+                <th>horizon</th>
+                <th>date</th>
+                <th>predicted</th>
+                <th>actual</th>
+                <th>delta</th>
+                <th>status</th>
+            </tr>
+        </thead>
+        <tbody id="track-tbody">
+            {% for row in rows %}
+            <tr class="kairon-track-row" data-run-id="{{ row.run_id }}">
+                <td>{{ row.asset }}</td>
+                <td><span class="kairon-horizon-pill kairon-horizon-pill--{{ row.horizon }}">{{ row.horizon }}</span></td>
+                <td>{{ row.date.strftime('%Y-%m-%d %H:%M') }} UTC</td>
+                <td>{{ '%.2f%%' % (row.predicted_pct * 100) }}</td>
+                <td>{% if row.actual_pct is not none %}{{ '%.2f%%' % (row.actual_pct * 100) }}{% else %}—{% endif %}</td>
+                <td>{% if row.delta_pct is not none %}{{ '%.2f%%' % (row.delta_pct * 100) }}{% else %}—{% endif %}</td>
+                <td><span class="kairon-status-pill kairon-status-pill--{{ row.status }}"><span class="kairon-status-pill-icon">{% if row.status == 'hit' %}✓{% elif row.status == 'missed' %}✗{% else %}·{% endif %}</span> {{ row.status }}</span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <script>
+        (function() {
+            document.querySelectorAll('.kairon-track-row').forEach(function(row) {
+                row.addEventListener('click', function() {
+                    const id = this.getAttribute('data-run-id');
+                    window.location.href = '/result/' + encodeURIComponent(id) + '?from=track';
+                });
+                row.style.cursor = 'pointer';
+            });
+        })();
+    </script>
+</section>
+{% endblock %}

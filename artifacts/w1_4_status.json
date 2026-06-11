@@ -1,0 +1,79 @@
+{
+  "story_id": "W1.4",
+  "title": "KaironSettings additions for live venue, API keys, history days",
+  "status": "passes",
+  "decided_at_iso": "2026-06-07",
+  "files_changed": [
+    "src/kairon/config/__init__.py",
+    "tests/config/test_settings.py"
+  ],
+  "tests_added": 5,
+  "test_names": [
+    "tests/config/test_settings.py::test_settings_w1_4_defaults",
+    "tests/config/test_settings.py::test_settings_w1_4_env_override",
+    "tests/config/test_settings.py::test_settings_w1_4_live_venue_validates_pattern",
+    "tests/config/test_settings.py::test_settings_w1_4_history_days_validates_ge_1",
+    "tests/config/test_settings.py::test_settings_w1_4_overrides_includes_new_fields"
+  ],
+  "pyright_errors": 0,
+  "pyright_warnings": 35,
+  "pyright_warnings_note": "All informational; the 30 existing tmp_path-type warnings are pre-existing test-code style; the 5 new W1.4 warnings are nil. pyrightconfig.json demotes all to warnings.",
+  "pytest_regression": {
+    "passed": 439,
+    "skipped": 15,
+    "failed": 0,
+    "baseline_passed": 434,
+    "delta": 5
+  },
+  "fields_added": {
+    "live_venue": {
+      "type": "str",
+      "default": "binance",
+      "env_var": "KAIRON_LIVE_VENUE",
+      "pattern": "^(binance|bybit|coinbase)$"
+    },
+    "binance_api_key": {
+      "type": "str",
+      "default": "",
+      "env_var": "KAIRON_BINANCE_API_KEY"
+    },
+    "binance_api_secret": {
+      "type": "str",
+      "default": "",
+      "env_var": "KAIRON_BINANCE_API_SECRET"
+    },
+    "polygon_api_key": {
+      "type": "str",
+      "default": "",
+      "env_var": "KAIRON_POLYGON_API_KEY"
+    },
+    "history_days": {
+      "type": "int",
+      "default": 30,
+      "env_var": "KAIRON_HISTORY_DAYS",
+      "constraint": "ge=1"
+    }
+  },
+  "acceptance_criteria_check": [
+    {
+      "id": "settings_has_5_new_fields",
+      "passes": true,
+      "evidence": "src/kairon/config/__init__.py KaironSettings adds 5 fields: live_venue (str, pattern), binance_api_key (str, default ''), binance_api_secret (str, default ''), polygon_api_key (str, default ''), history_days (int, ge=1, default 30)"
+    },
+    {
+      "id": "tests_assert_fields_exist",
+      "passes": true,
+      "evidence": "test_settings_w1_4_defaults + test_settings_w1_4_env_override assert the 5 fields exist with correct types and constraints"
+    },
+    {
+      "id": "pyright_strict_baseline_preserved",
+      "passes": true,
+      "evidence": "uv run pyright reports 0 errors on the modified files (35 informational warnings, all demoted per pyrightconfig.json)"
+    },
+    {
+      "id": "full_suite_no_regression",
+      "passes": true,
+      "evidence": "uv run pytest --tb=short -q: 439 passed (baseline 434 + 5 new), 15 skipped, 0 failed"
+    }
+  ]
+}

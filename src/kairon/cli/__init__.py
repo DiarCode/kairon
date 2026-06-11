@@ -1,0 +1,1 @@
+"""Kairon CLI — Command-line interface for market analysis and prediction."""

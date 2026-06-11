@@ -1,0 +1,34 @@
+# Default model-loss configuration.
+#
+# This file is the source of truth for the W5.gate exit: the Trainer's
+# ``loss_fn`` argument is read from this YAML (or the equivalent CLI
+# flag) and threaded into ``Model.fit(loss_fn=...)`` per the W5.1 +
+# W5.2 + W5.3 wiring.
+#
+# The schema is intentionally flat and stable: every key is a top-level
+# loss-function choice with an ``enabled`` boolean. A new loss can be
+# shipped additively by adding a single new block; no consumer changes
+# are required.
+#
+# Default = ``cross_entropy`` (the v1 behaviour, preserved as the
+# baseline). ``sharpe`` and ``cost_focal`` are OPT-IN because they
+# require torch (and the W5 release marks them as experimental).
+
+loss_fn: cross_entropy   # default; one of: cross_entropy, sharpe, cost_focal
+
+# Optional / opt-in loss functions. Both require torch; the W5.2 / W5.3
+# release ships their implementations, and the trainer's loss switch
+# (W5.1) routes them into the model's fit call. Setting ``enabled: true``
+# here is a one-line change that activates the loss in the next
+# backtest run; leaving ``enabled: false`` preserves the v1 behaviour.
+sharpe:
+  enabled: false
+  temperature: 1.0
+  reduction: mean
+
+cost_focal:
+  enabled: false
+  alpha: 2.0
+  gamma: 2.0
+  cost_weight_cap: null   # null = unbounded
+  eps: 1.0e-12

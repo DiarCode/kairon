@@ -1,0 +1,111 @@
+{
+  "story_id": "W1.3",
+  "title": "AlmgrenChrissModel with eta=0.5 placeholder and is_calibrated flag",
+  "status": "passes",
+  "decided_at_iso": "2026-06-07",
+  "files_changed": [
+    "src/kairon/backtest/impact.py",
+    "src/kairon/backtest/cost.py",
+    "tests/backtest/test_impact.py"
+  ],
+  "files_added": [
+    "src/kairon/backtest/impact.py",
+    "tests/backtest/test_impact.py",
+    "artifacts/w1_3_status.json"
+  ],
+  "tests_added": 23,
+  "test_names": [
+    "tests/backtest/test_impact.py::test_placeholder_eta",
+    "tests/backtest/test_impact.py::test_default_eta_is_half",
+    "tests/backtest/test_impact.py::test_is_calibrated_can_be_set_true_for_calibrated_run",
+    "tests/backtest/test_impact.py::test_eta_must_be_positive",
+    "tests/backtest/test_impact.py::test_is_calibrated_must_be_bool",
+    "tests/backtest/test_impact.py::test_eta_nan_rejected",
+    "tests/backtest/test_impact.py::test_compute_rejects_negative_qty",
+    "tests/backtest/test_impact.py::test_compute_rejects_zero_adv",
+    "tests/backtest/test_impact.py::test_compute_rejects_negative_sigma",
+    "tests/backtest/test_impact.py::test_compute_rejects_zero_price",
+    "tests/backtest/test_impact.py::test_compute_rejects_negative_price",
+    "tests/backtest/test_impact.py::test_compute_rejects_invalid_side",
+    "tests/backtest/test_impact.py::test_compute_accepts_zero_sigma",
+    "tests/backtest/test_impact.py::test_buy_sell_symmetry",
+    "tests/backtest/test_impact.py::test_monotonic_in_qty",
+    "tests/backtest/test_impact.py::test_monotonic_in_sigma",
+    "tests/backtest/test_impact.py::test_monotonic_in_eta",
+    "tests/backtest/test_impact.py::test_model_is_frozen",
+    "tests/backtest/test_impact.py::test_model_equality_is_value_based",
+    "tests/backtest/test_impact.py::test_cost_model_default_unchanged",
+    "tests/backtest/test_impact.py::test_cost_model_with_impact_model_adds_bps_term",
+    "tests/backtest/test_impact.py::test_cost_model_impact_model_rejects_non_algren_object",
+    "tests/backtest/test_impact.py::test_cost_model_impact_model_buy_vs_sell_symmetry"
+  ],
+  "pyright_errors": 0,
+  "pyright_warnings": 14,
+  "pyright_warnings_note": "14 reportUnknownMemberType warnings on pytest.approx are an artefact of pytest's missing type stubs; pyrightconfig.json demotes reportUnknownMemberType to 'warning' (matches the 24 informational warnings noted in the W1.1 status file). No code-action suggestions produced.",
+  "pytest_regression": {
+    "passed": 434,
+    "skipped": 15,
+    "failed": 0,
+    "baseline_passed": 411,
+    "delta": 23,
+    "note": "Baseline 411 reflects the W1.1 (394+5) + W1.2 (+12) total. W1.3 adds 23. Total: 434 passed, 15 skipped, 0 failed, 0 regressions. Existing 411 tests pass byte-for-byte: DEFAULT_CRYPTO_COSTS and DEFAULT_STOCK_COSTS still have impact_model=None, and the legacy 2-arg cost.total_cost(notional, side) call site in engine.py produces identical results."
+  },
+  "placeholder_math": {
+    "eta": 0.5,
+    "is_calibrated": false,
+    "formula": "impact = eta * sigma * sqrt(qty / adv) * price",
+    "fixture": {
+      "price": 50000.0,
+      "qty": 1.0,
+      "adv": 1000.0,
+      "sigma": 0.01
+    },
+    "expected_impact_price_units": 7.905694150420948,
+    "expected_impact_bps": 1.5811388300841896,
+    "tolerance": "1e-9 absolute (float-exact, matches PRD W1.3 acceptance criterion #2)"
+  },
+  "cost_model_extension": {
+    "new_field": "impact_model: AlmgrenChrissModel | None (default None)",
+    "default_crypto_costs_impact_model": null,
+    "default_stock_costs_impact_model": null,
+    "default_crypto_legacy_total_cost_10k_buy": 14.0,
+    "default_stock_legacy_total_cost_10k_sell": 5.0,
+    "new_total_cost_signature": "total_cost(notional, side, *, adv=None, sigma=None, price=None, qty=None)",
+    "impact_term_unit": "bps of notional (added when impact_model is set AND all 4 impact inputs are provided)",
+    "engine_py_call_site_unchanged": true,
+    "note": "Adding impact_model=None as default keeps the existing 2-arg call in engine.py producing byte-identical results. The impact term activates only when the caller explicitly threads adv/sigma/price/qty through (future W3-4 work)."
+  },
+  "real_data_capture": {
+    "attempted": false,
+    "captured": false,
+    "note": "W1.3 ships a pure-compute placeholder by design. W2 will calibrate eta from real ccxt public-trade prints. W3-4 story 3.7 will re-run meta-label generation if the W2-calibrated eta differs from this placeholder by more than 2x."
+  },
+  "acceptance_criteria_check": [
+    {
+      "id": "impact_module_exists",
+      "passes": true,
+      "evidence": "src/kairon/backtest/impact.py created (177 lines). AlmgrenChrissModel is a frozen=True, slots=True dataclass with eta: float = 0.5, is_calibrated: bool = False. Validation in __post_init__: eta>0 and finite; is_calibrated must be True/False (identity check, rejects 0/1 ints). compute(price, qty, adv, sigma, *, side='buy') returns impact in price units; compute_bps(...) returns 10000*impact/price. Side Literal={'buy','sell'}; symmetric. Module is pure (no IO, no async)."
+    },
+    {
+      "id": "test_placeholder_eta_passes",
+      "passes": true,
+      "evidence": "tests/backtest/test_impact.py::test_placeholder_eta passes. Constructs AlmgrenChrissModel(eta=0.5, is_calibrated=False), asserts is_calibrated is False, asserts eta==0.5, asserts compute(50000, 1, 1000, 0.01) == 0.5*0.01*sqrt(0.001)*50000 within 1e-9 (exact float math), asserts compute_bps returns ~1.581138 bps within 1e-6, and re-asserts is_calibrated is False (placeholder marker sticky)."
+    },
+    {
+      "id": "cost_model_extended_with_optional_impact_model",
+      "passes": true,
+      "evidence": "src/kairon/backtest/cost.py::CostModel extended with impact_model: AlmgrenChrissModel | None = field(default=None, compare=False). __post_init__ rejects non-AlmgrenChrissModel values via type() identity check. total_cost signature extended with optional adv, sigma, price, qty kwargs (default None); impact term is added in bps only when impact_model is set AND all 4 impact inputs are provided. Legacy 2-arg call from engine.py is untouched and produces byte-identical results."
+    },
+    {
+      "id": "existing_tests_still_pass",
+      "passes": true,
+      "evidence": "uv run pytest --tb=short -q: 434 passed, 15 skipped, 0 failed. 0 regressions. DEFAULT_CRYPTO_COSTS.impact_model is None and DEFAULT_STOCK_COSTS.impact_model is None (verified by test_cost_model_default_unchanged). Legacy 2-arg total_cost(notional, side) call from engine.py continues to compute commission+slippage+half_spread with no impact term."
+    },
+    {
+      "id": "is_calibrated_false_marker",
+      "passes": true,
+      "evidence": "DEFAULT_ETA = 0.5 exported from impact.py. AlmgrenChrissModel() default constructor returns eta=0.5, is_calibrated=False. The W3-4 story 3.7 cost-ML re-work loop will key off this flag and the W2 calibration will flip it to True when a calibrated value is published."
+    }
+  ],
+  "notes": "W1.3 ships the placeholder Almgren-Chriss model with eta=0.5 and is_calibrated=False. The model is a frozen dataclass (not pydantic) to match the existing project pattern in cost.py. The cost-model extension is fully backward-compatible: the impact term activates only when impact_model is set AND all 4 impact inputs (adv, sigma, price, qty) are provided to total_cost; the legacy 2-arg call site in engine.py is byte-identical. W2 will calibrate eta per asset class from real ccxt public-trade prints; the is_calibrated flag will flip at that time. W3-4 story 3.7 (cost-ML re-work loop) will re-run meta-label generation if the W2-calibrated eta drifts from this placeholder by more than 2x."
+}

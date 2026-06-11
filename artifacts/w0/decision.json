@@ -1,0 +1,39 @@
+{
+  "decided_at_iso": "2026-06-07T11:42:00Z",
+  "decided_by": "ralph engineer (W0 owner)",
+  "fallback_active": true,
+  "scope": "BTC-only",
+  "blocking_items": {
+    "W0.1_polygon_or_tiingo_key": {
+      "resolved": false,
+      "consequence": "W1.2 US-equity adapter is stub-only; W8 SPY/AAPL leg dropped"
+    },
+    "W0.2_ccxt_pro_or_public_ws": {
+      "resolved": false,
+      "decision": "Public WS first (free tier); upgrade to ccxt.pro later if user provides license",
+      "consequence": "W1.1 CcxtCandleFeed uses public WS path"
+    },
+    "W0.3_2y_history_source": {
+      "resolved": false,
+      "decision": "1-month sample from public Binance REST (free, no key) for W1; extend to 6mo for W8",
+      "consequence": "W8 headline is 6mo BTCUSDT (not 12mo) for REST rate-limit budget"
+    }
+  },
+  "in_scope": [
+    "W1.1 Binance + Bybit public WS",
+    "W1.3 Almgren-Chriss placeholder",
+    "W1.4 KaironSettings 5 new fields",
+    "W1.5 Partitioned parquet writer",
+    "W1.6 Leakage fixture",
+    "W2 cost calibration from 1mo ccxt public trades + break-even table for BTC/ETH/SOL",
+    "W3-10 BTC/ETH/SOL only"
+  ],
+  "deferred_to_phase_2_or_until_W0_resolved": [
+    "W1.2 US-equity WebSocket adapter (stub only in W1)",
+    "W8 SPY/AAPL/US-equity backtest",
+    "Cross-asset BTC+SPY portfolio analysis",
+    "L2 microstructure features (Tardis/LOBSTER) - already Phase 2"
+  ],
+  "sign_off_doc": "reports/w0_fallback.md",
+  "plan_consistency": "explicitly allowed by plan W0: 'if any of the BLOCKING items are not confirmed by W0 start, the plan adapts: drop SPY/AAPL from W8 and ship BTC-only as the headline deliverable.'"
+}

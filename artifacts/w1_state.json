@@ -1,0 +1,60 @@
+{
+  "decided_at_iso": "2026-06-07T12:58:00Z",
+  "decided_by": "ralph iteration 1, W1.gate verification",
+  "w1_artifacts_complete": true,
+  "binance_1m_rows": 0,
+  "binance_1m_rows_note": "0 rows captured live; the W1.1 CcxtCandleFeed is fully tested with a mocked ccxt client (5 tests) but real Binance WS capture is deferred (no network in CI; documented in reports/w1_1_network_unavailable.md with the exact follow-up PR recipe). Per W0 BTC-only fallback, real-data capture is a separate 1-PR change.",
+  "polygon_1h_rows": 0,
+  "polygon_1h_rows_note": "0 rows captured; W1.2 US-equity WebSocket is a typed STUB (USEquityWebSocketFeed with is_implemented: Literal[False]) per the W0 BTC-only fallback. Real Polygon/Tiingo implementation is a 1-PR change when user provides an API key; documented in reports/w1_2_stub_rationale.md.",
+  "impact_eta": 0.5,
+  "is_calibrated": false,
+  "is_calibrated_note": "Placeholder per plan §W1.3. W2 will calibrate eta from 1mo ccxt public trades; W3-4 task 3.7 checks for > 2x drift and re-runs if so.",
+  "w1_stories_status": {
+    "W0": "passes (fallback decision documented)",
+    "W1.1": "passes (CcxtCandleFeed + 5 tests)",
+    "W1.2": "passes (USEquityWebSocketFeed stub + 12 tests)",
+    "W1.3": "passes (AlmgrenChrissModel + 23 tests)",
+    "W1.4": "passes (KaironSettings 5 new fields + 5 tests)",
+    "W1.5": "passes (write_partitioned + 6 tests, Hive-style layout for DuckDB pushdown)",
+    "W1.6": "passes (tests/fixtures/leakage.py + 19 tests)"
+  },
+  "w1_test_count": {
+    "baseline_w0": 394,
+    "after_w1_1": 399,
+    "after_w1_2": 411,
+    "after_w1_3": 434,
+    "after_w1_4": 439,
+    "after_w1_5": 445,
+    "after_w1_6": 464,
+    "w1_total_new_tests": 70,
+    "w1_total_tests_passed": 464,
+    "w1_total_skipped": 15,
+    "w1_total_failed": 0
+  },
+  "w1_pyright": {
+    "files_checked": [
+      "src/kairon/live/feed.py",
+      "src/kairon/data/adapters/ccxt_adapter.py",
+      "src/kairon/data/adapters/us_equity_ws.py",
+      "src/kairon/backtest/impact.py",
+      "src/kairon/backtest/cost.py",
+      "src/kairon/config/__init__.py",
+      "src/kairon/data/io.py",
+      "tests/live/test_ccxt_feed.py",
+      "tests/data/test_us_equity_ws.py",
+      "tests/backtest/test_impact.py",
+      "tests/config/test_settings.py",
+      "tests/data/test_partitioning.py",
+      "tests/fixtures/"
+    ],
+    "errors": 0,
+    "warnings": "informational only (pytest.approx, tmp_path, pyarrow internal types); all demoted per pyrightconfig.json"
+  },
+  "w2_stabilization_checkpoint": {
+    "pyright_green": true,
+    "tests_green": true,
+    "ready_to_lock": true,
+    "lock_for_w3_4_modifications": "W3-4 will modify Trainer (meta-learner wiring), CostModel impact_model field, and LabelKind Literal (MetaLabel). W1.gate's green status is the lock; W2 must run before W3-4 to catch any drift."
+  },
+  "w1_to_w2_handoff": "W1.1 CcxtCandleFeed + W1.5 write_partitioned together enable W2's cost calibration from 1mo ccxt public trades. W1.3 AlmgrenChrissModel is the placeholder; W2 calibrates eta and updates artifacts/w1_state.json. W1.4 KaironSettings has the env vars W2's calibration script reads."
+}

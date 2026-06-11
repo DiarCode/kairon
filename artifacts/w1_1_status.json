@@ -1,0 +1,61 @@
+{
+  "story_id": "W1.1",
+  "title": "CcxtCandleFeed with watch_ohlcv for Binance + Bybit",
+  "status": "passes",
+  "decided_at_iso": "2026-06-07",
+  "files_changed": [
+    "src/kairon/live/feed.py",
+    "src/kairon/data/adapters/ccxt_adapter.py",
+    "tests/live/test_ccxt_feed.py"
+  ],
+  "tests_added": 5,
+  "test_names": [
+    "tests/live/test_ccxt_feed.py::test_1m_candle_round_trip",
+    "tests/live/test_ccxt_feed.py::test_feed_emits_one_row_per_unique_1m_bucket",
+    "tests/live/test_ccxt_feed.py::test_aclose_is_idempotent_without_underlying_client",
+    "tests/live/test_ccxt_feed.py::test_config_is_frozen_and_strict",
+    "tests/live/test_ccxt_feed.py::test_feed_rejects_unsupported_venue"
+  ],
+  "pyright_errors": 0,
+  "pyright_warnings": 0,
+  "pytest_regression": {
+    "passed": 399,
+    "skipped": 15,
+    "failed": 0,
+    "baseline_passed": 394,
+    "delta": 5
+  },
+  "real_data_capture": {
+    "attempted": false,
+    "captured": false,
+    "note": "reports/w1_1_network_unavailable.md"
+  },
+  "acceptance_criteria_check": [
+    {
+      "id": "feed_module_exists",
+      "passes": true,
+      "evidence": "src/kairon/live/feed.py created; CcxtCandleFeed consumes ccxt.async_support.watch_ohlcv on Binance and Bybit via the extended CCXTAdapter.watch_ohlcv."
+    },
+    {
+      "id": "ccxt_adapter_extended",
+      "passes": true,
+      "evidence": "src/kairon/data/adapters/ccxt_adapter.py::CCXTAdapter.watch_ohlcv added; wraps underlying client.watch_ohlcv and emits one-row OHLCV_SCHEMA pyarrow tables to a typed callback. Existing afetch/fetch methods unchanged."
+    },
+    {
+      "id": "test_1m_candle_round_trip_passes",
+      "passes": true,
+      "evidence": "tests/live/test_ccxt_feed.py::test_1m_candle_round_trip passes; feeds 3 successive 1m ticks in the same 60s bucket, asserts exactly 1 closed bucket row, asserts OHLCV_SCHEMA, asserts aclose() is idempotent (close.await_count == 1 across two calls)."
+    },
+    {
+      "id": "no_ccxt_pro_dependency",
+      "passes": true,
+      "evidence": "Implementation uses ccxt.async_support.watch_ohlcv only; no ccxt.pro import. Supported venues restricted to Binance and Bybit (CcxtCandleFeed.SUPPORTED_VENUES); other CryptoVenue values are rejected at construction."
+    },
+    {
+      "id": "real_data_capture_or_documented",
+      "passes": true,
+      "evidence": "Real-data capture deferred per W0 BTC-only fallback (reports/w0_fallback.md). Test is fully hermetic. See reports/w1_1_network_unavailable.md for the one-paragraph explanation."
+    }
+  ],
+  "notes": "W1.1 ships the public-WS path. ccxt.pro upgrade is a future 1-PR change per the plan. The ccxt_client seam (src/kairon/data/adapters/_ccxt_client.py) is reused unchanged."
+}

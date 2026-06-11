@@ -1,0 +1,694 @@
+{
+  "schema_version": "1",
+  "story_id": "W3.5",
+  "decided_at_iso": "2026-06-08T07:59:27Z",
+  "assets": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT"
+  ],
+  "horizons": [
+    "5m",
+    "15m",
+    "1h",
+    "1d"
+  ],
+  "reference_point_coverage_pct": [
+    25,
+    10
+  ],
+  "synthetic_fixture": {
+    "n_bars": 288,
+    "feature_window": 8,
+    "horizon_bars": 12,
+    "seed": 20260608,
+    "base_sigma": 0.01,
+    "vol_multipliers": {
+      "BTCUSDT": 1.0,
+      "ETHUSDT": 1.3,
+      "SOLUSDT": 1.8
+    }
+  },
+  "rows": [
+    {
+      "asset": "BTCUSDT",
+      "horizon": "5m",
+      "t_at_25pct_coverage": 0.8375,
+      "t_at_25pct_accuracy": 0.2008928571428572,
+      "t_at_10pct_coverage": 0.845,
+      "t_at_10pct_accuracy": 0.0803571428571428,
+      "full_curve": [
+        {
+          "threshold": 0.5,
+          "coverage": 1.0,
+          "accuracy": 0.8035714285714286
+        },
+        {
+          "threshold": 0.55,
+          "coverage": 1.0,
+          "accuracy": 0.8035714285714286
+        },
+        {
+          "threshold": 0.6,
+          "coverage": 1.0,
+          "accuracy": 0.8035714285714286
+        },
+        {
+          "threshold": 0.65,
+          "coverage": 1.0,
+          "accuracy": 0.8035714285714286
+        },
+        {
+          "threshold": 0.7,
+          "coverage": 1.0,
+          "accuracy": 0.8035714285714286
+        },
+        {
+          "threshold": 0.75,
+          "coverage": 1.0,
+          "accuracy": 0.8035714285714286
+        },
+        {
+          "threshold": 0.8,
+          "coverage": 1.0,
+          "accuracy": 0.8035714285714286
+        },
+        {
+          "threshold": 0.85,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        },
+        {
+          "threshold": 0.9,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        }
+      ]
+    },
+    {
+      "asset": "BTCUSDT",
+      "horizon": "15m",
+      "t_at_25pct_coverage": 0.8375,
+      "t_at_25pct_accuracy": 0.19374999999999998,
+      "t_at_10pct_coverage": 0.845,
+      "t_at_10pct_accuracy": 0.07750000000000001,
+      "full_curve": [
+        {
+          "threshold": 0.5,
+          "coverage": 1.0,
+          "accuracy": 0.775
+        },
+        {
+          "threshold": 0.55,
+          "coverage": 1.0,
+          "accuracy": 0.775
+        },
+        {
+          "threshold": 0.6,
+          "coverage": 1.0,
+          "accuracy": 0.775
+        },
+        {
+          "threshold": 0.65,
+          "coverage": 1.0,
+          "accuracy": 0.775
+        },
+        {
+          "threshold": 0.7,
+          "coverage": 1.0,
+          "accuracy": 0.775
+        },
+        {
+          "threshold": 0.75,
+          "coverage": 1.0,
+          "accuracy": 0.775
+        },
+        {
+          "threshold": 0.8,
+          "coverage": 1.0,
+          "accuracy": 0.775
+        },
+        {
+          "threshold": 0.85,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        },
+        {
+          "threshold": 0.9,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        }
+      ]
+    },
+    {
+      "asset": "BTCUSDT",
+      "horizon": "1h",
+      "t_at_25pct_coverage": 0.7875000000000001,
+      "t_at_25pct_accuracy": 0.18571428571428572,
+      "t_at_10pct_coverage": 0.795,
+      "t_at_10pct_accuracy": 0.07428571428571429,
+      "full_curve": [
+        {
+          "threshold": 0.5,
+          "coverage": 1.0,
+          "accuracy": 0.7428571428571429
+        },
+        {
+          "threshold": 0.55,
+          "coverage": 1.0,
+          "accuracy": 0.7428571428571429
+        },
+        {
+          "threshold": 0.6,
+          "coverage": 1.0,
+          "accuracy": 0.7428571428571429
+        },
+        {
+          "threshold": 0.65,
+          "coverage": 1.0,
+          "accuracy": 0.7428571428571429
+        },
+        {
+          "threshold": 0.7,
+          "coverage": 1.0,
+          "accuracy": 0.7428571428571429
+        },
+        {
+          "threshold": 0.75,
+          "coverage": 1.0,
+          "accuracy": 0.7428571428571429
+        },
+        {
+          "threshold": 0.8,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        },
+        {
+          "threshold": 0.85,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        },
+        {
+          "threshold": 0.9,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        }
+      ]
+    },
+    {
+      "asset": "BTCUSDT",
+      "horizon": "1d",
+      "t_at_25pct_coverage": 0.8375,
+      "t_at_25pct_accuracy": 0.1919642857142857,
+      "t_at_10pct_coverage": 0.845,
+      "t_at_10pct_accuracy": 0.07678571428571423,
+      "full_curve": [
+        {
+          "threshold": 0.5,
+          "coverage": 1.0,
+          "accuracy": 0.7678571428571429
+        },
+        {
+          "threshold": 0.55,
+          "coverage": 1.0,
+          "accuracy": 0.7678571428571429
+        },
+        {
+          "threshold": 0.6,
+          "coverage": 1.0,
+          "accuracy": 0.7678571428571429
+        },
+        {
+          "threshold": 0.65,
+          "coverage": 1.0,
+          "accuracy": 0.7678571428571429
+        },
+        {
+          "threshold": 0.7,
+          "coverage": 1.0,
+          "accuracy": 0.7678571428571429
+        },
+        {
+          "threshold": 0.75,
+          "coverage": 1.0,
+          "accuracy": 0.7678571428571429
+        },
+        {
+          "threshold": 0.8,
+          "coverage": 1.0,
+          "accuracy": 0.7678571428571429
+        },
+        {
+          "threshold": 0.85,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        },
+        {
+          "threshold": 0.9,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        }
+      ]
+    },
+    {
+      "asset": "ETHUSDT",
+      "horizon": "5m",
+      "t_at_25pct_coverage": 0.8375,
+      "t_at_25pct_accuracy": 0.19821428571428568,
+      "t_at_10pct_coverage": 0.845,
+      "t_at_10pct_accuracy": 0.07928571428571429,
+      "full_curve": [
+        {
+          "threshold": 0.5,
+          "coverage": 1.0,
+          "accuracy": 0.7928571428571428
+        },
+        {
+          "threshold": 0.55,
+          "coverage": 1.0,
+          "accuracy": 0.7928571428571428
+        },
+        {
+          "threshold": 0.6,
+          "coverage": 1.0,
+          "accuracy": 0.7928571428571428
+        },
+        {
+          "threshold": 0.65,
+          "coverage": 1.0,
+          "accuracy": 0.7928571428571428
+        },
+        {
+          "threshold": 0.7,
+          "coverage": 1.0,
+          "accuracy": 0.7928571428571428
+        },
+        {
+          "threshold": 0.75,
+          "coverage": 1.0,
+          "accuracy": 0.7928571428571428
+        },
+        {
+          "threshold": 0.8,
+          "coverage": 1.0,
+          "accuracy": 0.7928571428571428
+        },
+        {
+          "threshold": 0.85,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        },
+        {
+          "threshold": 0.9,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        }
+      ]
+    },
+    {
+      "asset": "ETHUSDT",
+      "horizon": "15m",
+      "t_at_25pct_coverage": 0.7744525547445256,
+      "t_at_25pct_accuracy": 0.3878736213969844,
+      "t_at_10pct_coverage": 0.7897810218978103,
+      "t_at_10pct_accuracy": 0.15514944855879376,
+      "full_curve": [
+        {
+          "threshold": 0.5,
+          "coverage": 1.0,
+          "accuracy": 0.7178571428571429
+        },
+        {
+          "threshold": 0.55,
+          "coverage": 1.0,
+          "accuracy": 0.7178571428571429
+        },
+        {
+          "threshold": 0.6,
+          "coverage": 1.0,
+          "accuracy": 0.7178571428571429
+        },
+        {
+          "threshold": 0.65,
+          "coverage": 1.0,
+          "accuracy": 0.7178571428571429
+        },
+        {
+          "threshold": 0.7,
+          "coverage": 1.0,
+          "accuracy": 0.7178571428571429
+        },
+        {
+          "threshold": 0.75,
+          "coverage": 0.48928571428571427,
+          "accuracy": 0.7591240875912408
+        },
+        {
+          "threshold": 0.8,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        },
+        {
+          "threshold": 0.85,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        },
+        {
+          "threshold": 0.9,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        }
+      ]
+    },
+    {
+      "asset": "ETHUSDT",
+      "horizon": "1h",
+      "t_at_25pct_coverage": 0.7875000000000001,
+      "t_at_25pct_accuracy": 0.18928571428571428,
+      "t_at_10pct_coverage": 0.795,
+      "t_at_10pct_accuracy": 0.07571428571428573,
+      "full_curve": [
+        {
+          "threshold": 0.5,
+          "coverage": 1.0,
+          "accuracy": 0.7571428571428571
+        },
+        {
+          "threshold": 0.55,
+          "coverage": 1.0,
+          "accuracy": 0.7571428571428571
+        },
+        {
+          "threshold": 0.6,
+          "coverage": 1.0,
+          "accuracy": 0.7571428571428571
+        },
+        {
+          "threshold": 0.65,
+          "coverage": 1.0,
+          "accuracy": 0.7571428571428571
+        },
+        {
+          "threshold": 0.7,
+          "coverage": 1.0,
+          "accuracy": 0.7571428571428571
+        },
+        {
+          "threshold": 0.75,
+          "coverage": 1.0,
+          "accuracy": 0.7571428571428571
+        },
+        {
+          "threshold": 0.8,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        },
+        {
+          "threshold": 0.85,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        },
+        {
+          "threshold": 0.9,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        }
+      ]
+    },
+    {
+      "asset": "ETHUSDT",
+      "horizon": "1d",
+      "t_at_25pct_coverage": 0.8375,
+      "t_at_25pct_accuracy": 0.19999999999999996,
+      "t_at_10pct_coverage": 0.845,
+      "t_at_10pct_accuracy": 0.07999999999999996,
+      "full_curve": [
+        {
+          "threshold": 0.5,
+          "coverage": 1.0,
+          "accuracy": 0.8
+        },
+        {
+          "threshold": 0.55,
+          "coverage": 1.0,
+          "accuracy": 0.8
+        },
+        {
+          "threshold": 0.6,
+          "coverage": 1.0,
+          "accuracy": 0.8
+        },
+        {
+          "threshold": 0.65,
+          "coverage": 1.0,
+          "accuracy": 0.8
+        },
+        {
+          "threshold": 0.7,
+          "coverage": 1.0,
+          "accuracy": 0.8
+        },
+        {
+          "threshold": 0.75,
+          "coverage": 1.0,
+          "accuracy": 0.8
+        },
+        {
+          "threshold": 0.8,
+          "coverage": 1.0,
+          "accuracy": 0.8
+        },
+        {
+          "threshold": 0.85,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        },
+        {
+          "threshold": 0.9,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        }
+      ]
+    },
+    {
+      "asset": "SOLUSDT",
+      "horizon": "5m",
+      "t_at_25pct_coverage": 0.8375,
+      "t_at_25pct_accuracy": 0.19374999999999998,
+      "t_at_10pct_coverage": 0.845,
+      "t_at_10pct_accuracy": 0.07750000000000001,
+      "full_curve": [
+        {
+          "threshold": 0.5,
+          "coverage": 1.0,
+          "accuracy": 0.775
+        },
+        {
+          "threshold": 0.55,
+          "coverage": 1.0,
+          "accuracy": 0.775
+        },
+        {
+          "threshold": 0.6,
+          "coverage": 1.0,
+          "accuracy": 0.775
+        },
+        {
+          "threshold": 0.65,
+          "coverage": 1.0,
+          "accuracy": 0.775
+        },
+        {
+          "threshold": 0.7,
+          "coverage": 1.0,
+          "accuracy": 0.775
+        },
+        {
+          "threshold": 0.75,
+          "coverage": 1.0,
+          "accuracy": 0.775
+        },
+        {
+          "threshold": 0.8,
+          "coverage": 1.0,
+          "accuracy": 0.775
+        },
+        {
+          "threshold": 0.85,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        },
+        {
+          "threshold": 0.9,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        }
+      ]
+    },
+    {
+      "asset": "SOLUSDT",
+      "horizon": "15m",
+      "t_at_25pct_coverage": 0.8375,
+      "t_at_25pct_accuracy": 0.19999999999999996,
+      "t_at_10pct_coverage": 0.845,
+      "t_at_10pct_accuracy": 0.07999999999999996,
+      "full_curve": [
+        {
+          "threshold": 0.5,
+          "coverage": 1.0,
+          "accuracy": 0.8
+        },
+        {
+          "threshold": 0.55,
+          "coverage": 1.0,
+          "accuracy": 0.8
+        },
+        {
+          "threshold": 0.6,
+          "coverage": 1.0,
+          "accuracy": 0.8
+        },
+        {
+          "threshold": 0.65,
+          "coverage": 1.0,
+          "accuracy": 0.8
+        },
+        {
+          "threshold": 0.7,
+          "coverage": 1.0,
+          "accuracy": 0.8
+        },
+        {
+          "threshold": 0.75,
+          "coverage": 1.0,
+          "accuracy": 0.8
+        },
+        {
+          "threshold": 0.8,
+          "coverage": 1.0,
+          "accuracy": 0.8
+        },
+        {
+          "threshold": 0.85,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        },
+        {
+          "threshold": 0.9,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        }
+      ]
+    },
+    {
+      "asset": "SOLUSDT",
+      "horizon": "1h",
+      "t_at_25pct_coverage": 0.7875000000000001,
+      "t_at_25pct_accuracy": 0.18660714285714286,
+      "t_at_10pct_coverage": 0.795,
+      "t_at_10pct_accuracy": 0.07464285714285712,
+      "full_curve": [
+        {
+          "threshold": 0.5,
+          "coverage": 1.0,
+          "accuracy": 0.7464285714285714
+        },
+        {
+          "threshold": 0.55,
+          "coverage": 1.0,
+          "accuracy": 0.7464285714285714
+        },
+        {
+          "threshold": 0.6,
+          "coverage": 1.0,
+          "accuracy": 0.7464285714285714
+        },
+        {
+          "threshold": 0.65,
+          "coverage": 1.0,
+          "accuracy": 0.7464285714285714
+        },
+        {
+          "threshold": 0.7,
+          "coverage": 1.0,
+          "accuracy": 0.7464285714285714
+        },
+        {
+          "threshold": 0.75,
+          "coverage": 1.0,
+          "accuracy": 0.7464285714285714
+        },
+        {
+          "threshold": 0.8,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        },
+        {
+          "threshold": 0.85,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        },
+        {
+          "threshold": 0.9,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        }
+      ]
+    },
+    {
+      "asset": "SOLUSDT",
+      "horizon": "1d",
+      "t_at_25pct_coverage": 0.7875000000000001,
+      "t_at_25pct_accuracy": 0.18571428571428572,
+      "t_at_10pct_coverage": 0.795,
+      "t_at_10pct_accuracy": 0.07428571428571429,
+      "full_curve": [
+        {
+          "threshold": 0.5,
+          "coverage": 1.0,
+          "accuracy": 0.7428571428571429
+        },
+        {
+          "threshold": 0.55,
+          "coverage": 1.0,
+          "accuracy": 0.7428571428571429
+        },
+        {
+          "threshold": 0.6,
+          "coverage": 1.0,
+          "accuracy": 0.7428571428571429
+        },
+        {
+          "threshold": 0.65,
+          "coverage": 1.0,
+          "accuracy": 0.7428571428571429
+        },
+        {
+          "threshold": 0.7,
+          "coverage": 1.0,
+          "accuracy": 0.7428571428571429
+        },
+        {
+          "threshold": 0.75,
+          "coverage": 1.0,
+          "accuracy": 0.7428571428571429
+        },
+        {
+          "threshold": 0.8,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        },
+        {
+          "threshold": 0.85,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        },
+        {
+          "threshold": 0.9,
+          "coverage": 0.0,
+          "accuracy": 0.0
+        }
+      ]
+    }
+  ]
+}

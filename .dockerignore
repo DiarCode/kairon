@@ -1,0 +1,45 @@
+# Keep the build context small and the build cache stable.
+
+# VCS / IDE / OS noise
+.git
+.gitignore
+.gitattributes
+.github
+.idea
+.vscode
+.DS_Store
+Thumbs.db
+
+# Python
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+
+# Plan / spec / state — never needed inside the image
+.omc
+.claude
+
+# Tests — the prod image never runs pytest
+tests
+
+# Local dev artifacts
+runs
+data
+reports
+*.log
+
+# Build helpers — must remain in the build context, even though they
+# don't need to be in the final image. We COPY only the ones the
+# Dockerfile needs (Dockerfile itself, entrypoint.sh); the rest are
+# excluded by the patterns below.
+Dockerfile
+docker-compose.yml
+.dockerignore

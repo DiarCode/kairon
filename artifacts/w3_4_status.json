@@ -1,0 +1,88 @@
+{
+  "story_id": "W3.4",
+  "title": "W3.4 — MetaLabeledEnsemble combinator (additive on TopKConfidenceEnsemble)",
+  "status": "passes",
+  "decided_at_iso": "2026-06-08",
+  "files_added": [],
+  "files_changed": [
+    "src/kairon/models/ensemble.py",
+    "tests/models/test_ensemble.py"
+  ],
+  "tests_added": 3,
+  "test_names": [
+    "tests/models/test_ensemble.py::test_metalabeled_combinator",
+    "tests/models/test_ensemble.py::test_metalabeled_combinator_preserves_strict_typing",
+    "tests/models/test_ensemble.py::test_metalabeled_combinator_handles_low_meta_proba"
+  ],
+  "pyright_errors": 0,
+  "pyright_warnings_note": "Same pyrightconfig.json demotes-warnings pattern as W1.x/W2.x: reportUnknownMemberType on pytest.approx is informational, not blocking. 0 errors is what the W3-4.gate pyright --strict check requires.",
+  "pytest_regression": {
+    "passed_total": 489,
+    "skipped": 15,
+    "failed": 0,
+    "baseline_passed": 486,
+    "delta": 3,
+    "note": "Baseline 486 reflects W2.3's 482 + the W3.2 metalabel + W3.3 metalearner tests from parallel agents in the ralph loop (4 W3.2 + 0 W3.3 = the 4 additional pre-existing tests in tests/labels/test_metalabel.py that the current baseline already had committed before this story ran; the ralph loop snapshot at W2.3 close shows 482 + 4 = 486). W3.4 adds 3. Total: 489 passed, 15 skipped, 0 failed, 0 regressions."
+  },
+  "metalabeled_ensemble_class": {
+    "name": "MetaLabeledEnsemble",
+    "module": "kairon.models.ensemble",
+    "base_class": "kairon.models.base.Model[MetaLabeledEnsembleConfig]",
+    "config_class": "MetaLabeledEnsembleConfig",
+    "trained_state": "MetaLabeledTrained (frozen/slots dataclass holding primary TrainedModel, meta TrainedModel, both Model objects, the config snapshot, feature_names, target_kind, classes, created_at_ns, extras)",
+    "constructor": "MetaLabeledEnsemble(primary: Model[Any], meta_learner: Model[Any], config: MetaLabeledEnsembleConfig | None = None)",
+    "config_defaults": {
+      "coverage_threshold": 0.5,
+      "meta_proba_floor": 0.0
+    },
+    "fit_method": "_fit_core trains the primary first via primary.fit(features, y, sample_weight=sample_weight), then stacks (p_primary, features.values) as the meta-learner's input FeatureMatrix and fits the meta-learner on the same y",
+    "predict_method": "_predict_core runs primary.predict then meta.predict on the stacked input, computes p_final = p_primary * p_meta, abstains (y_class = 0/FLAT, y_proba = 0.0) where p_meta < coverage_threshold OR p_final < meta_proba_floor",
+    "abstain_class": "0 (the FLAT/DirectionClass.FLAT class) when classes contain 0; otherwise the smallest class index",
+    "raises": "ModelError when primary is the same object as meta_learner (must be distinct); ModelError when primary or meta emits y_proba=None (binary meta-label requires probabilities); ModelError on feature-name mismatch between fit and predict",
+    "extras_recorded": ["primary_backend", "meta_backend"]
+  },
+  "acceptance_criteria_check": [
+    {
+      "id": "metalabeled_ensemble_class_exists",
+      "passes": true,
+      "evidence": "src/kairon/models/ensemble.py extended (was 341 lines, now 595 lines; +254 lines) with: MetaLabeledEnsembleConfig (frozen/slots dataclass, validates 0<=coverage_threshold<=1 and 0<=meta_proba_floor<=1), MetaLabeledTrained (frozen/slots dataclass holding both TrainedModel + Model references + the config snapshot), helper functions _primary_proba_scalar and _meta_proba_scalar (extract 1-D p_primary/p_meta from 1-D or 2-D y_proba), and MetaLabeledEnsemble class extending Model[MetaLabeledEnsembleConfig] with name='metalabeled_ensemble' and kind='ensemble'."
+    },
+    {
+      "id": "test_metalabeled_combinator_passes",
+      "passes": true,
+      "evidence": "tests/models/test_ensemble.py::test_metalabeled_combinator passes. Uses two test-double backends (_ConstantBinaryPrimary with p_primary=0.7 and _ConstantMeta with p_meta=0.3) so the contract is exercised deterministically. Asserts p_final = 0.7*0.3 = 0.21 (NOT min(0.7, 0.3) = 0.3) and that p_meta=0.0 hard-abstains to y_proba=0.0, y_class=0."
+    },
+    {
+      "id": "test_metalabeled_combinator_preserves_strict_typing_passes",
+      "passes": true,
+      "evidence": "tests/models/test_ensemble.py::test_metalabeled_combinator_preserves_strict_typing passes. Uses real LogisticRegressionModel + MetaLearnerModel (the W3.3 backend), constructs the combinator with the typed MetaLabeledEnsembleConfig, and exercises fit + predict end-to-end. The strict-typing proof is the gate that follows the test in the W3.4 verification step (uv run pyright reports 0 errors)."
+    },
+    {
+      "id": "test_metalabeled_combinator_handles_low_meta_proba_passes",
+      "passes": true,
+      "evidence": "tests/models/test_ensemble.py::test_metalabeled_combinator_handles_low_meta_proba passes. With coverage_threshold=0.5 and p_meta=0.4 (below the threshold), the output y_proba is 0.0 and y_class is 0 (FLAT) for every row."
+    },
+    {
+      "id": "pyright_strict_zero_errors",
+      "passes": true,
+      "evidence": "uv run pyright src/kairon/models/ensemble.py tests/models/test_ensemble.py reports 0 errors. The combinator is fully typed: Model[MetaLabeledEnsembleConfig] generic, MetaLabeledTrained dataclass, and the test-double backends (Model[object]) use the same ABC generic pattern as the existing test_ensemble.py::_WeirdClassifier."
+    },
+    {
+      "id": "full_suite_no_regression",
+      "passes": true,
+      "evidence": "uv run pytest --tb=short -q: 489 passed (baseline 486 + 3 new W3.4 tests), 15 skipped, 0 failed, 0 regressions."
+    }
+  ],
+  "additivity_note": "Per Architect round 1 Tension C, the combinator is ADDITIVE on TopKConfidenceEnsemble, not a replacement. The primary may be a TopKConfidenceEnsemble (or any other Model[Any] with binary y_proba). The combinator's predict outputs the primary's class on emitted rows and FLAT/0 on abstained rows; the p_final is the product p_primary * p_meta.",
+  "design_decisions": [
+    "MetaLabeledEnsembleConfig is a separate frozen dataclass from EnsembleSpec to keep the two combinators' type systems independent; W3.4 (meta-label stacking) and the existing TopKConfidenceEnsemble have different concerns (coverage threshold + proba floor vs. min_k/max_k/confidence_floor).",
+    "The combinator is trained on the primary's IN-SAMPLE predictions. The OOF protocol (W3.6) lives at the trainer layer; the combinator's contract is 'given a fitted primary and a fitted meta, produce a prediction' — exactly the W3.6 + W3.7 wiring the trainer will compose.",
+    "The abstained class is 0 (the FLAT/DirectionClass.FLAT class when 0 is in the class set). The combinator does not invent a new abstain class; it maps to the existing DirectionClass.FLAT so the downstream policy/sizer layer needs no special-case code for 'meta-label abstained' vs 'primary says FLAT'.",
+    "The meta-learner's input is the (p_primary, original_features) stack: this is a minimal but principled choice. The W3.3 MetaLearnerModel's preferred schema is p_primary + side features; the combinator provides the canonical p_primary column and forwards the original features as the side features. A future story can swap in a richer FeatureMatrix by subclassing MetaLabeledEnsemble and overriding _build_meta_features."
+  ],
+  "deviation_from_spec": {
+    "meta_feature_stack": "Spec says 'meta-learner takes the primary's y_proba + side features'. The implementation stacks p_primary + features.values as the meta input. This is the minimal 'p_primary + side features' stack: the original features are the side features. The combinator is subclass-friendly: a custom subclass can override _build_meta_features to inject vol_z/spread_bps/regime/time_of_day_sin/cos/recent_meta_win_rate columns from a future store, without changing the combinator's public contract.",
+    "abstain_class_choice": "Spec says 'output = FLAT class'. The implementation uses 0 (DirectionClass.FLAT) when 0 is in the trained class set; otherwise the smallest class index. The default 2-class primary (0, 1) always has 0 in its class set, so the canonical case is exactly FLAT. The fallback handles the 3-class case (DOWN/FLAT/UP) and the regression case (where classes=None and the smallest index 0 is still emitted)."
+  },
+  "notes": "W3.4 ships the MetaLabeledEnsemble combinator with the additive semantics from Architect round 1 Tension C. The combinator wires any Model[Any] primary (TopKConfidenceEnsemble, single XGBoost, a small stack) with any Model[Any] meta-learner (the W3.3 MetaLearnerModel, or a future subclass) and produces a Prediction whose p_final = p_primary * p_meta, with explicit abstention when p_meta < coverage_threshold OR p_final < meta_proba_floor. The combinator is fully typed for pyright --strict. The 3 W3.4 tests cover: (1) the p_final product contract + the p_meta=0 hard abstention; (2) the strict-typing surface (real LogisticRegressionModel + MetaLearnerModel end-to-end); (3) the coverage_threshold low-meta-proba abstention. Total tests: 489 passed, 15 skipped, 0 failed, 0 regressions."
+}

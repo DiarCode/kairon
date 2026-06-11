@@ -1,0 +1,1 @@
+# Figure generator package.

@@ -1,0 +1,637 @@
+{
+  "experiments": {
+    "results": {
+      "per_backend": [
+        {
+          "name": "logreg",
+          "n_folds": 6,
+          "mean_acc": 0.6158333333333333,
+          "std_acc": 0.045762065804186194,
+          "mean_logloss": 1.6167725375210666,
+          "mean_brier": 0.3124936752107575
+        },
+        {
+          "name": "random_forest",
+          "n_folds": 6,
+          "mean_acc": 0.65,
+          "std_acc": 0.007071067811865481,
+          "mean_logloss": 1.4445563352102786,
+          "mean_brier": 0.29338564841529186
+        },
+        {
+          "name": "ensemble_lr_rf",
+          "n_folds": 6,
+          "mean_acc": 0.6616666666666667,
+          "std_acc": 0.03587013613950562,
+          "mean_logloss": 1.4464782267100904,
+          "mean_brier": 0.2976184855038563
+        }
+      ],
+      "ablations": {
+        "confidence_floor": [
+          {
+            "tau": 0.34,
+            "acc": 0.6616666666666667,
+            "ll": 1.4464782267100904
+          },
+          {
+            "tau": 0.4,
+            "acc": 0.66,
+            "ll": 1.4659697420457276
+          },
+          {
+            "tau": 0.5,
+            "acc": 0.65,
+            "ll": 1.5155349670082259
+          },
+          {
+            "tau": 0.6,
+            "acc": 0.65,
+            "ll": 1.5824537807515444
+          },
+          {
+            "tau": 0.7,
+            "acc": 0.65,
+            "ll": 1.6334221796992716
+          },
+          {
+            "tau": 0.8,
+            "acc": 0.65,
+            "ll": 1.660214727280333
+          }
+        ],
+        "combinator": [
+          {
+            "name": "topk",
+            "acc": 0.6616666666666667,
+            "ll": 1.4464782267100904
+          },
+          {
+            "name": "mean",
+            "acc": 0.6616666666666667,
+            "ll": 1.4465012272208797
+          },
+          {
+            "name": "kmax_1",
+            "acc": 0.65,
+            "ll": 1.6655038476357025
+          }
+        ],
+        "ensemble_size": [
+          {
+            "name": "LR",
+            "acc": 0.6158333333333333,
+            "ll": 1.6167725375210666
+          },
+          {
+            "name": "LR+RF",
+            "acc": 0.6616666666666667,
+            "ll": 1.4464782267100904
+          }
+        ]
+      },
+      "dsr_sweep": [
+        {
+          "n_trials": 1,
+          "n_trades": 1,
+          "final_equity": 6969.4957308996645,
+          "total_return": -0.3030504269100336,
+          "sharpe": -2.987733249096409,
+          "sortino": -4.529483743290188,
+          "max_dd": -0.3694433210721377,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "dsr_sharpe": -2.987733249096409,
+          "dsr_value": 0.0,
+          "dsr_pvalue": 1.0,
+          "dsr_sr_star": 0.0
+        },
+        {
+          "n_trials": 5,
+          "n_trades": 1,
+          "final_equity": 6969.4957308996645,
+          "total_return": -0.3030504269100336,
+          "sharpe": -2.987733249096409,
+          "sortino": -4.529483743290188,
+          "max_dd": -0.3694433210721377,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "dsr_sharpe": -2.987733249096409,
+          "dsr_value": 0.0,
+          "dsr_pvalue": 1.0,
+          "dsr_sr_star": 2.0784958550901185
+        },
+        {
+          "n_trials": 10,
+          "n_trades": 1,
+          "final_equity": 6969.4957308996645,
+          "total_return": -0.3030504269100336,
+          "sharpe": -2.987733249096409,
+          "sortino": -4.529483743290188,
+          "max_dd": -0.3694433210721377,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "dsr_sharpe": -2.987733249096409,
+          "dsr_value": 0.0,
+          "dsr_pvalue": 1.0,
+          "dsr_sr_star": 2.759019949377217
+        },
+        {
+          "n_trials": 50,
+          "n_trades": 1,
+          "final_equity": 6969.4957308996645,
+          "total_return": -0.3030504269100336,
+          "sharpe": -2.987733249096409,
+          "sortino": -4.529483743290188,
+          "max_dd": -0.3694433210721377,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "dsr_sharpe": -2.987733249096409,
+          "dsr_value": 0.0,
+          "dsr_pvalue": 1.0,
+          "dsr_sr_star": 4.041857755307411
+        },
+        {
+          "n_trials": 100,
+          "n_trades": 1,
+          "final_equity": 6969.4957308996645,
+          "total_return": -0.3030504269100336,
+          "sharpe": -2.987733249096409,
+          "sortino": -4.529483743290188,
+          "max_dd": -0.3694433210721377,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "dsr_sharpe": -2.987733249096409,
+          "dsr_value": 0.0,
+          "dsr_pvalue": 1.0,
+          "dsr_sr_star": 4.509689850891966
+        }
+      ],
+      "cost_ablation": [
+        {
+          "name": "zero",
+          "rt_bps": 0,
+          "n_trades": 1,
+          "final_equity": 6969.4957308996645,
+          "total_return": -0.3030504269100336,
+          "sharpe": -2.987733249096409,
+          "sortino": -4.529483743290188,
+          "max_dd": -0.3694433210721377,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "dsr_sharpe": -2.987733249096409,
+          "dsr_value": 0.0,
+          "dsr_pvalue": 1.0,
+          "dsr_sr_star": 0.0
+        },
+        {
+          "name": "cheap",
+          "rt_bps": 12,
+          "n_trades": 1,
+          "final_equity": 6962.314033461125,
+          "total_return": -0.30376859665388745,
+          "sharpe": -2.996635494872715,
+          "sortino": -4.543939982865482,
+          "max_dd": -0.3694433210721377,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "dsr_sharpe": -2.996635494872715,
+          "dsr_value": 0.0,
+          "dsr_pvalue": 1.0,
+          "dsr_sr_star": 0.0
+        },
+        {
+          "name": "default",
+          "rt_bps": 28,
+          "n_trades": 1,
+          "final_equity": 6952.738436876405,
+          "total_return": -0.30472615631235944,
+          "sharpe": -3.0083775376208344,
+          "sortino": -4.562341260644439,
+          "max_dd": -0.3694433210721377,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "dsr_sharpe": -3.0083775376208344,
+          "dsr_value": 0.0,
+          "dsr_pvalue": 1.0,
+          "dsr_sr_star": 0.0
+        },
+        {
+          "name": "rich",
+          "rt_bps": 60,
+          "n_trades": 1,
+          "final_equity": 6933.587243706966,
+          "total_return": -0.30664127562930343,
+          "sharpe": -3.0314180885160162,
+          "sortino": -4.596103959621814,
+          "max_dd": -0.3694433210721377,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "dsr_sharpe": -3.0314180885160162,
+          "dsr_value": 0.0,
+          "dsr_pvalue": 1.0,
+          "dsr_sr_star": 0.0
+        },
+        {
+          "name": "stress",
+          "rt_bps": 120,
+          "n_trades": 1,
+          "final_equity": 6897.678756514267,
+          "total_return": -0.3102321243485733,
+          "sharpe": -3.072989440128178,
+          "sortino": -4.648290675725753,
+          "max_dd": -0.3694433210721377,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "dsr_sharpe": -3.072989440128178,
+          "dsr_value": 0.0,
+          "dsr_pvalue": 1.0,
+          "dsr_sr_star": 0.0
+        }
+      ]
+    },
+    "meta": {
+      "n_samples": 2924,
+      "n_features": 9,
+      "horizon": "1h",
+      "label_kind": "direction",
+      "flat_threshold_pct": 0.001,
+      "n_folds": 6,
+      "n_bars": 3000,
+      "majority_class_frac": 0.4630642954856361
+    }
+  },
+  "experiments_structured": {
+    "results": {
+      "per_backend": [
+        {
+          "name": "logreg",
+          "n_folds": 8,
+          "mean_acc": 0.94625,
+          "std_acc": 0.016850180160122043,
+          "mean_logloss": 13.903342609669442
+        },
+        {
+          "name": "random_forest",
+          "n_folds": 8,
+          "mean_acc": 0.9975,
+          "std_acc": 0.004629100498862762,
+          "mean_logloss": 9.010688756698254
+        },
+        {
+          "name": "ensemble_lr_rf",
+          "n_folds": 8,
+          "mean_acc": 0.99375,
+          "std_acc": 0.007440238091428456,
+          "mean_logloss": 7.4852552147664735
+        }
+      ],
+      "dsr_sweep": [
+        {
+          "n_trials": 1,
+          "n_trades": 1,
+          "final_equity": 5258.4321178028695,
+          "total_return": -0.4741567882197131,
+          "sharpe": -19.91285735896746,
+          "sortino": -24.11300980071849,
+          "max_dd": -0.4866581674652409,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "dsr_sharpe": -19.91285735896746,
+          "dsr_value": 0.0,
+          "dsr_pvalue": 1.0,
+          "dsr_sr_star": 0.0
+        },
+        {
+          "n_trials": 5,
+          "n_trades": 1,
+          "final_equity": 5258.4321178028695,
+          "total_return": -0.4741567882197131,
+          "sharpe": -19.91285735896746,
+          "sortino": -24.11300980071849,
+          "max_dd": -0.4866581674652409,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "dsr_sharpe": -19.91285735896746,
+          "dsr_value": 0.0,
+          "dsr_pvalue": 1.0,
+          "dsr_sr_star": 2.6446176174254354
+        },
+        {
+          "n_trials": 10,
+          "n_trades": 1,
+          "final_equity": 5258.4321178028695,
+          "total_return": -0.4741567882197131,
+          "sharpe": -19.91285735896746,
+          "sortino": -24.11300980071849,
+          "max_dd": -0.4866581674652409,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "dsr_sharpe": -19.91285735896746,
+          "dsr_value": 0.0,
+          "dsr_pvalue": 1.0,
+          "dsr_sr_star": 3.5990710981426632
+        },
+        {
+          "n_trials": 50,
+          "n_trades": 1,
+          "final_equity": 5258.4321178028695,
+          "total_return": -0.4741567882197131,
+          "sharpe": -19.91285735896746,
+          "sortino": -24.11300980071849,
+          "max_dd": -0.4866581674652409,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "dsr_sharpe": -19.91285735896746,
+          "dsr_value": 0.0,
+          "dsr_pvalue": 1.0,
+          "dsr_sr_star": 5.345991551280701
+        },
+        {
+          "n_trials": 100,
+          "n_trades": 1,
+          "final_equity": 5258.4321178028695,
+          "total_return": -0.4741567882197131,
+          "sharpe": -19.91285735896746,
+          "sortino": -24.11300980071849,
+          "max_dd": -0.4866581674652409,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "dsr_sharpe": -19.91285735896746,
+          "dsr_value": 0.0,
+          "dsr_pvalue": 1.0,
+          "dsr_sr_star": 5.973348468343268
+        }
+      ],
+      "cost_ablation": [
+        {
+          "name": "zero",
+          "rt_bps": 0,
+          "n_trades": 1,
+          "final_equity": 5258.4321178028695,
+          "total_return": -0.4741567882197131,
+          "sharpe": -19.91285735896746,
+          "sortino": -24.11300980071849,
+          "max_dd": -0.4866581674652409,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "dsr_sharpe": -19.91285735896746,
+          "dsr_value": 0.0,
+          "dsr_pvalue": 1.0,
+          "dsr_sr_star": 0.0
+        },
+        {
+          "name": "cheap",
+          "rt_bps": 12,
+          "n_trades": 1,
+          "final_equity": 5252.277058532188,
+          "total_return": -0.47477229414678124,
+          "sharpe": -19.948887036169186,
+          "sortino": -24.16557235140335,
+          "max_dd": -0.4866581674652409,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "dsr_sharpe": -19.948887036169186,
+          "dsr_value": 0.0,
+          "dsr_pvalue": 1.0,
+          "dsr_sr_star": 0.0
+        },
+        {
+          "name": "default",
+          "rt_bps": 28,
+          "n_trades": 1,
+          "final_equity": 5244.0703128379455,
+          "total_return": -0.4755929687162055,
+          "sharpe": -19.98557366707578,
+          "sortino": -24.20620017604729,
+          "max_dd": -0.4866581674652409,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "dsr_sharpe": -19.98557366707578,
+          "dsr_value": 0.0,
+          "dsr_pvalue": 1.0,
+          "dsr_sr_star": 0.0
+        },
+        {
+          "name": "rich",
+          "rt_bps": 60,
+          "n_trades": 1,
+          "final_equity": 5227.656821449461,
+          "total_return": -0.4772343178550539,
+          "sharpe": -20.020015986553943,
+          "sortino": -24.170182248289404,
+          "max_dd": -0.4866581674652409,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "dsr_sharpe": -20.020015986553943,
+          "dsr_value": 0.0,
+          "dsr_pvalue": 1.0,
+          "dsr_sr_star": 0.0
+        },
+        {
+          "name": "stress",
+          "rt_bps": 120,
+          "n_trades": 1,
+          "final_equity": 5196.881525096052,
+          "total_return": -0.4803118474903948,
+          "sharpe": -19.947992657195496,
+          "sortino": -23.709224219778253,
+          "max_dd": -0.4866581674652409,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "dsr_sharpe": -19.947992657195496,
+          "dsr_value": 0.0,
+          "dsr_pvalue": 1.0,
+          "dsr_sr_star": 0.0
+        }
+      ]
+    },
+    "meta": {
+      "n_samples": 2419,
+      "n_features": 7,
+      "horizon": "1h",
+      "label_kind": "direction",
+      "dataset": "structured_markov",
+      "n_bars": 2500,
+      "total_return": -0.964532377427385,
+      "majority_class_frac": 0.5514675485737909
+    }
+  },
+  "experiments_diagnostic": {
+    "results": {
+      "per_backend": [
+        {
+          "name": "logreg",
+          "in_acc": 0.9358786098874204,
+          "oos_acc": 0.930365296803653,
+          "in_ll": 12.764567981157022,
+          "oos_ll": 12.59099944384825,
+          "overfit_gap": 0.005513313083767457
+        },
+        {
+          "name": "random_forest",
+          "in_acc": 1.0,
+          "oos_acc": 1.0,
+          "in_ll": 5.160311036029076,
+          "oos_ll": 4.508803089885297,
+          "overfit_gap": 0.0
+        },
+        {
+          "name": "ensemble_lr_rf",
+          "in_acc": 0.9985315712187959,
+          "oos_acc": 0.9931506849315068,
+          "in_ll": NaN,
+          "oos_ll": NaN,
+          "overfit_gap": 0.005380886287289055
+        }
+      ],
+      "coverage_accuracy": [
+        {
+          "threshold": 0.5,
+          "coverage": 1.0,
+          "n": 876,
+          "acc": 0.9337899543378996
+        },
+        {
+          "threshold": 0.55,
+          "coverage": 1.0,
+          "n": 876,
+          "acc": 0.9337899543378996
+        },
+        {
+          "threshold": 0.6,
+          "coverage": 0.9988584474885844,
+          "n": 875,
+          "acc": 0.9348571428571428
+        },
+        {
+          "threshold": 0.65,
+          "coverage": 0.9988584474885844,
+          "n": 875,
+          "acc": 0.9348571428571428
+        },
+        {
+          "threshold": 0.7,
+          "coverage": 0.997716894977169,
+          "n": 874,
+          "acc": 0.9347826086956522
+        },
+        {
+          "threshold": 0.75,
+          "coverage": 0.9954337899543378,
+          "n": 872,
+          "acc": 0.9346330275229358
+        },
+        {
+          "threshold": 0.8,
+          "coverage": 0.9874429223744292,
+          "n": 865,
+          "acc": 0.9341040462427745
+        },
+        {
+          "threshold": 0.85,
+          "coverage": 0.9646118721461188,
+          "n": 845,
+          "acc": 0.9349112426035503
+        },
+        {
+          "threshold": 0.9,
+          "coverage": 0.8984018264840182,
+          "n": 787,
+          "acc": 0.9415501905972046
+        },
+        {
+          "threshold": 0.95,
+          "coverage": 0.7294520547945206,
+          "n": 639,
+          "acc": 0.9702660406885759
+        }
+      ],
+      "calibration": [
+        {
+          "bin_lo": 0.0,
+          "bin_hi": 0.1,
+          "n": 373,
+          "mean_p": 0.018534332497179194,
+          "hit_rate": 0.0
+        },
+        {
+          "bin_lo": 0.1,
+          "bin_hi": 0.2,
+          "n": 13,
+          "mean_p": 0.124942139042463,
+          "hit_rate": 0.0
+        },
+        {
+          "bin_lo": 0.2,
+          "bin_hi": 0.30000000000000004,
+          "n": 0,
+          "mean_p": NaN,
+          "hit_rate": NaN
+        },
+        {
+          "bin_lo": 0.30000000000000004,
+          "bin_hi": 0.4,
+          "n": 0,
+          "mean_p": NaN,
+          "hit_rate": NaN
+        },
+        {
+          "bin_lo": 0.4,
+          "bin_hi": 0.5,
+          "n": 1,
+          "mean_p": 0.43060220430910084,
+          "hit_rate": 0.0
+        },
+        {
+          "bin_lo": 0.5,
+          "bin_hi": 0.6000000000000001,
+          "n": 0,
+          "mean_p": NaN,
+          "hit_rate": NaN
+        },
+        {
+          "bin_lo": 0.6000000000000001,
+          "bin_hi": 0.7000000000000001,
+          "n": 1,
+          "mean_p": 0.6751257855096489,
+          "hit_rate": 1.0
+        },
+        {
+          "bin_lo": 0.7000000000000001,
+          "bin_hi": 0.8,
+          "n": 9,
+          "mean_p": 0.7711762845956974,
+          "hit_rate": 1.0
+        },
+        {
+          "bin_lo": 0.8,
+          "bin_hi": 0.9,
+          "n": 65,
+          "mean_p": 0.86527291671474,
+          "hit_rate": 1.0
+        },
+        {
+          "bin_lo": 0.9,
+          "bin_hi": 1.0,
+          "n": 414,
+          "mean_p": 0.9634850479992269,
+          "hit_rate": 1.0
+        }
+      ]
+    },
+    "meta": {
+      "n_train": 2043,
+      "n_test": 876,
+      "n_features": 7,
+      "horizon": "1h",
+      "label_kind": "direction",
+      "drift": 0.002,
+      "vol": 0.01,
+      "dataset": "drift_random_walk",
+      "n_bars": 3000,
+      "total_return": 158.64176960266713,
+      "majority_class_frac": 0.5368276807125728
+    }
+  }
+}

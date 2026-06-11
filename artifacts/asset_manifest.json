@@ -1,0 +1,122 @@
+{
+  "generated_at": "2026-06-05",
+  "project": "kairon",
+  "scope": "Inventory of local research and dataset assets",
+  "researches": [
+    {
+      "id": "R-001",
+      "title": "Hybrid Quantum-Classical Ensemble Learning for S&P 500 Directional Prediction",
+      "type": "paper_md",
+      "format": "markdown",
+      "size_bytes": 71097,
+      "domain": "S&P 500 directional classification",
+      "period_covered": "2020-01 to 2023-12",
+      "instruments": ["S&P 500 (^GSPC)", "VIX", "Gold (GC=F)", "XLF", "XLK", "HYG", "IWM"],
+      "method_families": ["LSTM", "Decision Transformer", "XGBoost", "Random Forest", "Logistic Regression", "Variational Quantum Circuit (4-qubit)"],
+      "features": ["price-based", "volatility (5/10/20d rolling std)", "momentum (ROC)", "moving averages (SMA/EMA 5/10/20)", "Bollinger Bands", "RSI", "Quantum sentiment features"],
+      "target": "binary next-day direction of S&P 500",
+      "split": "70/30 temporal, 1006 train + 286 test",
+      "key_results": {
+        "top_individual_model": {"name": "VIX-LSTM", "accuracy": 0.5704},
+        "top_ensemble": {"name": "Top-7 majority vote", "accuracy": 0.6014, "ci95": [0.5684, 0.6344]},
+        "naive_ensemble_all_35": 0.5120,
+        "quantum_features_avg_gain_pct": 1.09,
+        "p_value_mcnemar": "<0.05",
+        "reported_sharpe_consensus_filtered": 1.2
+      },
+      "weaknesses_flagged": [
+        "Single asset focus",
+        "Adaptive overfitting risk (35 model combinations selected)",
+        "No transaction-cost-aware optimization beyond toy example",
+        "Quantum feature on classical simulator — no real quantum advantage demonstrated",
+        "No out-of-sample walk-forward; single temporal 70/30 split"
+      ],
+      "reproducibility_risk": "Medium (no public code provided as of paper)",
+      "useful_for_design": [
+        "Confirms architecture-diversity > dataset-diversity for ensembles",
+        "Quantifies gain from confidence-based filtering (smart filter ≥52%)",
+        "Demonstrates SOTA-realistic ceiling ≈60% directional accuracy for S&P 500 daily",
+        "Confirms regime-dependency: best in moderate-to-high VIX; degrades at VIX>35"
+      ]
+    },
+    {
+      "id": "R-002",
+      "title": "Improving Cryptocurrency Price Direction Forecasting: Confidence Score Thresholds on Random Forest Ensembles",
+      "type": "thesis_md",
+      "format": "markdown",
+      "size_bytes": 95872,
+      "domain": "Cryptocurrency high-frequency directional classification",
+      "period_covered": ["2017-07-17 to 2018-01-17 (BTC)", "2022-01-01 to 2023-12-31 (10 coins)"],
+      "instruments": ["BTC", "ETH", "LTC", "SOL", "XRP", "DOGE", "ADA", "CRV", "AVAX", "LINK"],
+      "data_source": "ByBit API, 5-min OHLCV",
+      "method_families": ["Random Forest (2-model mini-ensemble, RF1+RF2)"],
+      "features": ["ATR", "ADX", "BOP", "SMA", "EMA", "%return", "log return", "Lyapunov exponent", "MACD", "RSI", "volatility", "volume"],
+      "target": "binary direction at t + 60 bars (5h on 5-min bars; 60m on 1-min bars)",
+      "method": "Rolling-window retraining, N=2016 / K=60, threshold T on summed confidence",
+      "key_results": {
+        "no_threshold_avg_accuracy_btc_2017_2018": 0.6413,
+        "T_1.3_accuracy_btc_2017_2018": 0.6916,
+        "T_1.5_accuracy_btc_2017_2018": 0.7404,
+        "T_1.3_avg_accuracy_10_coins_2022_2023": 0.7130,
+        "T_1.5_avg_accuracy_10_coins_2022_2023": 0.7740,
+        "T_1.8_avg_accuracy_10_coins_2022_2023": 0.8850,
+        "remaining_data_pct_at_T_1.3": 56.5,
+        "remaining_data_pct_at_T_1.8": 6.7
+      },
+      "weaknesses_flagged": [
+        "Accuracy is conditional on the threshold T — high accuracy with very small coverage is not the same as high predictive skill",
+        "Threshold selection introduces selection bias / overfitting on a single backtest",
+        "RF1+RF2 same architecture — correlation >0.6 likely; limited diversity",
+        "Only 2 horizons tested (60 bars), no multi-horizon",
+        "No live trading validation; no realistic slippage beyond price-impact acknowledgement"
+      ],
+      "useful_for_design": [
+        "Confidence-threshold trade-off is explicit and useful for product UX",
+        "Rolling retraining cadence (7-day window, 5h test) is a sensible default",
+        "Adaptive Markets Hypothesis is the right framing for crypto (less mature, less efficient)",
+        "Suggests 60-75% accuracy is the realistic ceiling on high-frequency crypto with conf filtering",
+        "Provides concrete indicator list (43 candidates, ~10 used)"
+      ]
+    }
+  ],
+  "datasets": [
+    {
+      "id": "D-001",
+      "title": "DATASETS.md — 10 Public Crypto Datasets Index",
+      "type": "dataset_catalog",
+      "format": "markdown",
+      "size_bytes": 5491,
+      "datasets_listed": [
+        {"name": "Binance Full History (Tick-by-Tick)", "size": "~28 GB", "format": "Parquet/CSV", "since": "2021", "use": "HFT/microstructure"},
+        {"name": "Bitcoin Historical 2018-2026 (Binance)", "size": "~50-200 MB", "format": "CSV", "since": "2018", "use": "TA, LSTM, transformers"},
+        {"name": "BTCUSD 1-Minute (7 Exchanges)", "size": "~585 MB", "format": "CSV", "since": "2017", "use": "arbitrage, multi-venue"},
+        {"name": "Integrated Crypto Data (80+ Coins)", "size": "~500 MB-1 GB", "format": "CSV/Excel", "since": "2012", "use": "multi-asset"},
+        {"name": "CryptoDataDownload OHLCV", "size": "~100-500 MB/coin", "format": "CSV", "since": "2015", "use": "multi-timeframe"},
+        {"name": "Bitcoin Full-History Network (Graph)", "size": "~10-50 GB", "format": "Edge list/GraphML", "since": "2009", "use": "on-chain, GNN"},
+        {"name": "TWRR Financial Market Dataset", "size": "~2-3 GB", "format": "CSV", "since": "1950", "use": "multi-asset, regime"},
+        {"name": "Bitcoin Arbitrage (Multi-Exchange)", "size": "~100-300 MB", "format": "CSV", "use": "arbitrage"},
+        {"name": "Crypto Twitter/Reddit Sentiment", "size": "~1-5 GB", "format": "CSV/JSON", "since": "2019", "use": "sentiment"},
+        {"name": "CoinGecko Historical API (Free)", "format": "JSON/CSV", "since": "2014", "use": "broad market"}
+      ]
+    }
+  ],
+  "llm_usage_in_local_papers": "None of the local papers uses LLMs; this is a clear gap relative to the user requirement.",
+  "indicators_table_provided_by_user": {
+    "trend": ["EMA (5, 50, 200)", "SMA Crossover", "MACD", "ADX", "Ichimoku Cloud"],
+    "momentum": ["RSI", "Stochastic", "Williams %R", "CCI"],
+    "volatility": ["Bollinger Bands", "ATR"],
+    "volume": ["Volume Profile", "VWAP/AVWAP", "OBV", "CVD/Delta"],
+    "pattern": ["Fibonacci", "Candlestick Patterns"],
+    "structure": ["BOS/CHoCH (SMC)"],
+    "systemic": ["Wyckoff Method"],
+    "on_chain": ["Glassnode/MVRV (crypto-only)"]
+  },
+  "gaps_detected": [
+    "No LLM/RAG architecture in local papers — we must add an LLM (Ollama cloud) layer for research synthesis, hypothesis generation, evidence-grounded explanation, and user-facing reasoning.",
+    "No explicit purged/walk-forward evaluation in either paper — we must enforce this from day one.",
+    "No realistic slippage / market-impact model in either paper — we must add it.",
+    "No stocks dataset in local assets — we need to source one (e.g., TWRR).",
+    "No on-chain live data pipeline described — we need to decide how to use CryptoQuant/Glassnode.",
+    "No UX/persona work in either paper — we must design this from scratch."
+  ]
+}

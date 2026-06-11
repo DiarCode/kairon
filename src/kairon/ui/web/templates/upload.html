@@ -1,0 +1,52 @@
+{% extends "layout.html" %}
+{% block body %}
+<section class="kairon-glass-card kairon-screen">
+    <h1 class="kairon-screen-title">Upload</h1>
+    <form id="upload-form" method="post" action="/api/uploads" enctype="multipart/form-data">
+        <div class="kairon-drop-zone" id="kairon-drop-zone">
+            <p>Drop a TradingView CSV here, or <label class="kairon-text-link" for="csv-input">choose a file</label>.</p>
+            <input id="csv-input" type="file" name="file" accept=".csv,text/csv" hidden />
+        </div>
+        <div id="upload-status" class="kairon-upload-status">
+            {% if filename %}<p>Selected: <code>{{ filename }}</code> ({{ row_count }} rows)</p>{% endif %}
+        </div>
+        <button id="analyze-btn" type="button" class="kairon-primary-button" aria-disabled="true" disabled>
+            Analyze
+        </button>
+    </form>
+    <script>
+        (function() {
+            const input = document.getElementById('csv-input');
+            const drop = document.getElementById('kairon-drop-zone');
+            const status = document.getElementById('upload-status');
+            const btn = document.getElementById('analyze-btn');
+            let runId = null;
+            function enable() { btn.disabled = false; btn.removeAttribute('aria-disabled'); }
+            function disable() { btn.disabled = true; btn.setAttribute('aria-disabled', 'true'); }
+            async function upload(file) {
+                const fd = new FormData();
+                fd.append('file', file);
+                const r = await fetch('/api/uploads', { method: 'POST', body: fd });
+                if (!r.ok) { status.textContent = 'Upload failed.'; return; }
+                const j = await r.json();
+                runId = j.run_id;
+                status.innerHTML = '<p>Selected: <code>' + file.name + '</code> (' + j.row_count + ' rows)</p>';
+                enable();
+            }
+            input.addEventListener('change', e => { if (e.target.files[0]) upload(e.target.files[0]); });
+            ['dragover','dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); }));
+            drop.addEventListener('drop', e => {
+                e.preventDefault();
+                const f = e.dataTransfer.files[0];
+                if (f) upload(f);
+            });
+            btn.addEventListener('click', () => {
+                if (!runId) return;
+                // stash run_id in localStorage for the next screen
+                try { localStorage.setItem('kairon:run_id', runId); } catch (_) {}
+                window.location.href = '/configure?run_id=' + encodeURIComponent(runId);
+            });
+        })();
+    </script>
+</section>
+{% endblock %}
