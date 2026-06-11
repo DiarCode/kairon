@@ -27,6 +27,7 @@ from kairon.analysis.signals import SweetSpot
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _fmt_price(price: float) -> str:
     """Format price for hover text."""
     if abs(price) >= 1000:
@@ -77,13 +78,16 @@ def _add_regime_shapes(fig: go.Figure, df: pd.DataFrame, row: int) -> None:
 
         fig.add_shape(
             type="rect",
-            x0=start_ts, x1=end_ts,
-            y0=0, y1=1,
+            x0=start_ts,
+            x1=end_ts,
+            y0=0,
+            y1=1,
             yref=f"y{row} domain" if row > 1 else "y domain",
             fillcolor=_regime_color(str(regime)),
             line_width=0,
             layer="below",
-            row=row, col=1,
+            row=row,
+            col=1,
         )
 
 
@@ -125,14 +129,14 @@ def _add_sweet_spot_markers(
                     f"Confidence: {s.model_confidence:.1%}<br>"
                     f"Score: {s.combined_score:.1%}<br>"
                     f"Horizon: {s.timing_horizon}<br>"
-                    f"<b>Justifications:</b><br>"
-                    + "<br>".join(f"- {j}" for j in s.justifications)
+                    f"<b>Justifications:</b><br>" + "<br>".join(f"- {j}" for j in s.justifications)
                     for s in spot_list
                 ],
                 hoverinfo="text",
                 showlegend=True,
             ),
-            row=row, col=1,
+            row=row,
+            col=1,
         )
 
 
@@ -166,7 +170,9 @@ def _add_elliott_wave(
             pivot_ts.append(timestamps[idx])
         else:
             pivot_ts.append(idx)
-        pivot_prices.append(pivots[list(pivot_indices).index(idx) if idx in pivot_indices else 0].price)
+        pivot_prices.append(
+            pivots[list(pivot_indices).index(idx) if idx in pivot_indices else 0].price
+        )
 
     # Re-map pivot_ts from indices to timestamps
     pivot_ts_clean = []
@@ -200,7 +206,8 @@ def _add_elliott_wave(
                 hoverinfo="text",
                 showlegend=True,
             ),
-            row=row, col=1,
+            row=row,
+            col=1,
         )
 
 
@@ -246,7 +253,8 @@ def _add_fibonacci_levels(
             annotation_position="right",
             annotation_font_size=9,
             annotation_font_color=color,
-            row=row, col=1,
+            row=row,
+            col=1,
         )
 
 
@@ -271,7 +279,8 @@ def _add_bollinger_bands(
             showlegend=True,
             hoverinfo="y",
         ),
-        row=row, col=1,
+        row=row,
+        col=1,
     )
 
     fig.add_trace(
@@ -286,7 +295,8 @@ def _add_bollinger_bands(
             showlegend=True,
             hoverinfo="y",
         ),
-        row=row, col=1,
+        row=row,
+        col=1,
     )
 
 
@@ -314,7 +324,8 @@ def _add_emas(
                 showlegend=True,
                 hoverinfo="y",
             ),
-            row=row, col=1,
+            row=row,
+            col=1,
         )
 
 
@@ -339,19 +350,30 @@ def _add_rsi(
             showlegend=True,
             hoverinfo="y",
         ),
-        row=row, col=1,
+        row=row,
+        col=1,
     )
 
     # Overbought/oversold lines
     fig.add_hline(
-        y=70, line_dash="dash", line_color="#e74c3c", line_width=1,
-        annotation_text="Overbought (70)", annotation_position="right",
-        row=row, col=1,
+        y=70,
+        line_dash="dash",
+        line_color="#e74c3c",
+        line_width=1,
+        annotation_text="Overbought (70)",
+        annotation_position="right",
+        row=row,
+        col=1,
     )
     fig.add_hline(
-        y=30, line_dash="dash", line_color="#2ecc71", line_width=1,
-        annotation_text="Oversold (30)", annotation_position="right",
-        row=row, col=1,
+        y=30,
+        line_dash="dash",
+        line_color="#2ecc71",
+        line_width=1,
+        annotation_text="Oversold (30)",
+        annotation_position="right",
+        row=row,
+        col=1,
     )
 
 
@@ -382,7 +404,8 @@ def _add_volume(
             showlegend=True,
             hoverinfo="y",
         ),
-        row=row, col=1,
+        row=row,
+        col=1,
     )
 
 
@@ -419,7 +442,8 @@ def _add_sweet_spot_confidence_bars(
                 ],
                 hoverinfo="text",
             ),
-            row=row, col=1,
+            row=row,
+            col=1,
         )
 
 
@@ -442,7 +466,8 @@ def _add_ew_position(
                 showlegend=True,
                 hoverinfo="y",
             ),
-            row=row, col=1,
+            row=row,
+            col=1,
         )
 
     if "ew_completion_prob" in df.columns:
@@ -456,7 +481,8 @@ def _add_ew_position(
                 showlegend=True,
                 hoverinfo="y",
             ),
-            row=row, col=1,
+            row=row,
+            col=1,
         )
 
 
@@ -489,7 +515,8 @@ def _add_regime_probs(
                 showlegend=True,
                 hoverinfo="y",
             ),
-            row=row, col=1,
+            row=row,
+            col=1,
         )
 
 
@@ -512,7 +539,8 @@ def _add_volatility(
                 showlegend=True,
                 hoverinfo="y",
             ),
-            row=row, col=1,
+            row=row,
+            col=1,
         )
 
     if "atr_14" in df.columns:
@@ -526,13 +554,15 @@ def _add_volatility(
                 showlegend=True,
                 hoverinfo="y",
             ),
-            row=row, col=1,
+            row=row,
+            col=1,
         )
 
 
 # ---------------------------------------------------------------------------
 # Main dashboard builder
 # ---------------------------------------------------------------------------
+
 
 def build_dashboard(
     result: AnalysisResult,
@@ -578,7 +608,9 @@ def build_dashboard(
         if output_path.is_dir() or output_path.suffix == "":
             date_str = cs.timestamp.strftime("%Y%m%d")
             ext = "png" if static else "html"
-            output_path = output_path / f"{result.symbol}_{result.timeframe}_{date_str}_dashboard.{ext}"
+            output_path = (
+                output_path / f"{result.symbol}_{result.timeframe}_{date_str}_dashboard.{ext}"
+            )
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
     timestamps = df["ts"] if "ts" in df.columns else df.index
@@ -587,7 +619,8 @@ def build_dashboard(
     # Create 4-row subplot layout
     # -----------------------------------------------------------------------
     fig = make_subplots(
-        rows=4, cols=1,
+        rows=4,
+        cols=1,
         shared_xaxes=True,
         vertical_spacing=0.04,
         row_heights=[0.50, 0.18, 0.16, 0.16],
@@ -615,7 +648,8 @@ def build_dashboard(
             decreasing_line_color="#e74c3c",
             showlegend=True,
         ),
-        row=1, col=1,
+        row=1,
+        col=1,
     )
 
     # Bollinger Bands
@@ -702,13 +736,14 @@ def build_dashboard(
             x=spot.timestamp,
             y=spot.price,
             text=f"{emoji} {spot.direction}<br>{_fmt_price(spot.price)}<br>"
-                 f"Score: {spot.combined_score:.0%}",
+            f"Score: {spot.combined_score:.0%}",
             showarrow=True,
             arrowhead=2 if spot.direction == "SELL" else 3,
             arrowsize=0.8,
             arrowcolor=color,
             font=dict(size=9, color=color),
-            row=1, col=1,
+            row=1,
+            col=1,
         )
 
     # -----------------------------------------------------------------------

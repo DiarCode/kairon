@@ -9,6 +9,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
+from kairon.analysis.contracts import HorizonName, ProvenanceBlock
+
 router = APIRouter()
 
 
@@ -23,6 +25,12 @@ async def analyze_screen(request: Request) -> HTMLResponse:
     )
 
 
+# Module-level allowlist of horizons; kept in sync with HorizonName.
+# We don't reach for ``cast`` because src/kairon/ui/web/ has a CI guard
+# against Any/cast/type:ignore per AGENTS.md.
+_VALID_HORIZONS: frozenset[str] = frozenset(("day", "swing", "long"))
+
+
 @router.post("/api/runs")
 async def start_run(request: Request) -> JSONResponse:
     """Start a run for the given run_id + horizon. Returns the status URL.
@@ -34,7 +42,6 @@ async def start_run(request: Request) -> JSONResponse:
     import json
     from pathlib import Path
 
-    from kairon.analysis.contracts import ProvenanceBlock
     from kairon.analysis.engine import build_run_result, run_analysis
     from kairon.analysis.loader import load_csv
     from kairon.store.runs import RunStore
@@ -42,23 +49,48 @@ async def start_run(request: Request) -> JSONResponse:
     body = await request.body()
     payload = json.loads(body or b"{}")
     run_id = str(payload.get("run_id", ""))
-    horizon = str(payload.get("horizon", "day"))
+    raw_horizon = str(payload.get("horizon", "day"))
     csv_path = Path(str(payload.get("csv_path", "")))
     if not run_id or not csv_path.exists():
         return JSONResponse({"error": "missing run_id or csv_path"}, status_code=400)
+
+    # The horizon comes from the wire as a plain string; build_run_result
+    # requires a HorizonName literal. Validate it before passing through.
+    if raw_horizon not in _VALID_HORIZONS:
+        return JSONResponse(
+            {"error": f"unknown horizon {raw_horizon!r}; expected day|swing|long"},
+            status_code=400,
+        )
+    # Membership in _VALID_HORIZONS (= HorizonName's literal set) is the
+    # narrowing gate; we annotate the local explicitly so the rest of the
+    # function sees HorizonName and not ``str``.
+    horizon: HorizonName
+    if raw_horizon == "day":
+        horizon = "day"
+    elif raw_horizon == "swing":
+        horizon = "swing"
+    else:
+        horizon = "long"
 
     # Persist the run via RunStore (idempotent if user retries)
     store: RunStore = request.app.state.run_store
     try:
         result = load_csv(csv_path)
         analysis = run_analysis(
-            result.table, symbol=result.symbol, timeframe=result.timeframe, horizon=horizon
+            result.table,
+            symbol=result.symbol,
+            timeframe=result.timeframe.name,
+            horizon=horizon,
         )
         prov = ProvenanceBlock(
             config_hash="web-v1", data_hash=run_id, model_version="kairon-0.1.0", seed=42
         )
         run = build_run_result(
-            analysis, horizon=horizon, run_id=run_id, csv_path=csv_path, provenance=prov
+            analysis,
+            horizon=horizon,
+            run_id=run_id,
+            csv_path=csv_path,
+            provenance=prov,
         )
         store.create(run, csv_path)
     except Exception as e:

@@ -66,7 +66,11 @@ def test_post_runs_persists_a_run(tmp_path: Path, monkeypatch: Any) -> None:
     app = create_app()
     app.state.run_store = RunStore(tmp_path / "runs.db")
 
-    csv = b"ts,open,high,low,close,volume\n2026-01-01,1,2,0.5,1.5,10\n2026-01-02,2,3,1.5,2.5,20\n"
+    csv_lines = ["ts,open,high,low,close,volume"]
+    # Need at least 50 bars for load_csv to accept the file.
+    for i in range(80):
+        csv_lines.append(f"2026-01-{i // 30 + 1:02d}T{i % 24:02d}:00:00,1,2,0.5,1.5,10")
+    csv = ("\n".join(csv_lines) + "\n").encode("utf-8")
     stub_table = pa.table(
         {
             "ts": [datetime(2026, 1, 1, tzinfo=UTC)],

@@ -9,7 +9,9 @@ back button can route correctly.
 from __future__ import annotations
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
+
+from kairon.ui.web.state import TrackRow
 
 router = APIRouter()
 
@@ -22,10 +24,17 @@ async def result_screen(run_id: str, request: Request) -> HTMLResponse:
     run = store.get(run_id)
     if run is None:
         # Render a minimal "not found" bento rather than a 404 page; the spec
-        # is "no header, no sidebar" — we just show a single GlassCard.
-        from starlette.responses import Response
-
-        return Response("Run not found", status_code=404)
+        # is "no header, no sidebar" — we just show a single GlassCard. We
+        # render the same result.html shell and patch the HTTP status to 404
+        # so the route's response_model stays HTMLResponse (no cast needed)
+        # while still telling the client the resource is missing.
+        not_found = templates.TemplateResponse(
+            request,
+            "result.html",
+            {"request": request, "run": None, "back_target": "analyze"},
+        )
+        not_found.status_code = 404
+        return not_found
 
     # Resolve back target from ?from= (preferred) or Referer (fallback)
     from_param = request.query_params.get("from", "")
@@ -48,8 +57,6 @@ async def result_screen(run_id: str, request: Request) -> HTMLResponse:
 @router.get("/track", response_class=HTMLResponse)
 async def track_screen(request: Request) -> HTMLResponse:
     """Render the Track screen: a 7-column table of past runs."""
-    from kairon.ui.web.state import TrackRow
-
     templates = request.app.state.templates
     store = request.app.state.run_store
     runs = store.list_runs()
@@ -71,6 +78,4 @@ async def track_screen(request: Request) -> HTMLResponse:
                 status=status,
             )
         )
-    return templates.TemplateResponse(
-        request, "track.html", {"request": request, "rows": rows}
-    )
+    return templates.TemplateResponse(request, "track.html", {"request": request, "rows": rows})

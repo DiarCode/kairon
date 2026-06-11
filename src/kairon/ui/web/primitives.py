@@ -62,9 +62,7 @@ def bento_tile(ctx: Context, body: str = "", *, extra_class: str = "") -> str:
 
 
 @pass_context
-def big_number(
-    ctx: Context, value: str | float, unit: str = "", *, extra_class: str = ""
-) -> str:
+def big_number(ctx: Context, value: str | float, unit: str = "", *, extra_class: str = "") -> str:
     """Render a large monospace number with a smaller unit label."""
     cls = f"kairon-big-number {extra_class}".strip()
     return (
@@ -101,15 +99,11 @@ def horizon_pill(ctx: Context, horizon: str, *, extra_class: str = "") -> str:
 
 
 @pass_context
-def chart_frame(
-    ctx: Context, png_url: str, *, caption: str = "", extra_class: str = ""
-) -> str:
+def chart_frame(ctx: Context, png_url: str, *, caption: str = "", extra_class: str = "") -> str:
     """Wrap a static PNG in a 1px-bordered frame. No interactivity."""
     cls = f"kairon-chart-frame {extra_class}".strip()
     cap_block = (
-        f'<figcaption class="kairon-chart-frame-caption">{caption}</figcaption>'
-        if caption
-        else ""
+        f'<figcaption class="kairon-chart-frame-caption">{caption}</figcaption>' if caption else ""
     )
     return (
         f'<figure class="{cls}">'
@@ -150,9 +144,7 @@ def status_pill(ctx: Context, status: str, *, extra_class: str = "") -> str:
     icon = {"hit": "✓", "missed": "✗", "pending": "·"}.get(status, "·")
     cls = f"kairon-status-pill {variant} {extra_class}".strip()
     return (
-        f'<span class="{cls}">'
-        f'<span class="kairon-status-pill-icon">{icon}</span> {status}'
-        f"</span>"
+        f'<span class="{cls}"><span class="kairon-status-pill-icon">{icon}</span> {status}</span>'
     )
 
 

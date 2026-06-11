@@ -47,7 +47,9 @@ def _generate_sweet_spots_section(spots: tuple[SweetSpot, ...]) -> str:
     ]
 
     for i, spot in enumerate(spots, 1):
-        lines.append(f"### {i}. {_direction_emoji(spot.direction)} {spot.direction} @ {_format_price(spot.price)}")
+        lines.append(
+            f"### {i}. {_direction_emoji(spot.direction)} {spot.direction} @ {_format_price(spot.price)}"
+        )
         lines.append("")
         lines.append(f"| Attribute | Value |")
         lines.append(f"|---|---|")
@@ -99,11 +101,17 @@ def _generate_risk_section(risk: RiskLevels, current_price: float) -> str:
         lines.append(f"**Risk/Reward Ratios:**")
         lines.append(f"- TP1 (2x ATR): 1:1 R:R")
         lines.append(f"- TP2 (3x ATR): 1:1.5 R:R")
-        lines.append(f"- Fib Extension: 1:{risk.fib_tp_long / sl_distance:.1f} R:R (long)" if sl_distance > 0 else "")
+        lines.append(
+            f"- Fib Extension: 1:{risk.fib_tp_long / sl_distance:.1f} R:R (long)"
+            if sl_distance > 0
+            else ""
+        )
         lines.append("")
 
     lines.append(f"### Position Sizing\n")
-    lines.append(f"- **Recommended Position Size:** {_format_pct(risk.position_size_pct)} of equity")
+    lines.append(
+        f"- **Recommended Position Size:** {_format_pct(risk.position_size_pct)} of equity"
+    )
     lines.append("")
 
     return "\n".join(lines)
@@ -251,8 +259,10 @@ def _generate_features_section(result: AnalysisResult) -> str:
             groups.setdefault(prefix, []).append(fname)
 
         for prefix, features in sorted(groups.items()):
-            lines.append(f"- **{prefix}** ({len(features)}): `{", ".join(features[:8])}"
-            + (f"` ... +{len(features) - 8} more" if len(features) > 8 else "`"))
+            lines.append(
+                f"- **{prefix}** ({len(features)}): `{', '.join(features[:8])}"
+                + (f"` ... +{len(features) - 8} more" if len(features) > 8 else "`")
+            )
 
     lines.append("")
     return "\n".join(lines)
@@ -298,27 +308,35 @@ def _generate_executive_summary(result: AnalysisResult) -> str:
     ]
 
     if best_spot:
-        lines.append(f"**Strongest Signal:** {_direction_emoji(best_spot.direction)} {best_spot.direction} "
-                     f"@ {_format_price(best_spot.price)} "
-                     f"(score: {_format_pct(best_spot.combined_score)}, "
-                     f"horizon: {best_spot.timing_horizon})")
+        lines.append(
+            f"**Strongest Signal:** {_direction_emoji(best_spot.direction)} {best_spot.direction} "
+            f"@ {_format_price(best_spot.price)} "
+            f"(score: {_format_pct(best_spot.combined_score)}, "
+            f"horizon: {best_spot.timing_horizon})"
+        )
         lines.append("")
 
     # Quick risk summary
     lines.append(f"**Risk Summary:**")
-    lines.append(f"- Long SL: {_format_price(risk.stop_loss_long)} | "
-                 f"Long TP1: {_format_price(risk.take_profit_long_1)} | "
-                 f"Long TP2: {_format_price(risk.take_profit_long_2)}")
-    lines.append(f"- Short SL: {_format_price(risk.stop_loss_short)} | "
-                 f"Short TP1: {_format_price(risk.take_profit_short_1)} | "
-                 f"Short TP2: {_format_price(risk.take_profit_short_2)}")
+    lines.append(
+        f"- Long SL: {_format_price(risk.stop_loss_long)} | "
+        f"Long TP1: {_format_price(risk.take_profit_long_1)} | "
+        f"Long TP2: {_format_price(risk.take_profit_long_2)}"
+    )
+    lines.append(
+        f"- Short SL: {_format_price(risk.stop_loss_short)} | "
+        f"Short TP1: {_format_price(risk.take_profit_short_1)} | "
+        f"Short TP2: {_format_price(risk.take_profit_short_2)}"
+    )
     lines.append("")
 
     # Model predictions summary
     if result.model_predictions:
         for pred in result.model_predictions:
-            lines.append(f"- **{pred.model_name.upper()}**: {pred.direction.upper()} "
-                         f"(confidence: {_format_pct(pred.confidence)})")
+            lines.append(
+                f"- **{pred.model_name.upper()}**: {pred.direction.upper()} "
+                f"(confidence: {_format_pct(pred.confidence)})"
+            )
         lines.append("")
 
     return "\n".join(lines)

@@ -2,6 +2,14 @@
 {% block body %}
 <section class="kairon-glass-card kairon-screen">
     <h1 class="kairon-screen-title">Result</h1>
+    {% if run is none %}
+    <div class="kairon-bento">
+        <div class="kairon-bento-tile">
+            <p>Run not found.</p>
+        </div>
+    </div>
+    <a class="kairon-text-link" id="back-link" href="/analyze">back</a>
+    {% else %}
     <div class="kairon-bento" id="kairon-bento">
         {% for tile in run.models %}
         <div class="kairon-bento-tile kairon-model-tile" data-name="{{ tile.name }}">
@@ -38,5 +46,6 @@
             });
         })();
     </script>
+    {% endif %}
 </section>
 {% endblock %}

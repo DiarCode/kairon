@@ -32,6 +32,19 @@ def test_create_app_returns_fastapi_app() -> None:
 
 
 @pytest.mark.skipif(not _has_fastapi(), reason="fastapi not installed")
+def test_root_redirects_to_upload() -> None:
+    from fastapi.testclient import TestClient
+
+    from kairon.api.app import create_app
+
+    app = create_app()
+    client = TestClient(app)
+    resp = client.get("/", follow_redirects=False)
+    assert resp.status_code == 307
+    assert resp.headers["location"] == "/upload"
+
+
+@pytest.mark.skipif(not _has_fastapi(), reason="fastapi not installed")
 def test_healthz_endpoint() -> None:
     from fastapi.testclient import TestClient
 

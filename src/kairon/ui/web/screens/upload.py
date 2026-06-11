@@ -37,7 +37,7 @@ async def upload_csv(file: UploadFile = File(...)) -> JSONResponse:
 
     Saves the file under ``runs/<run_id>/input.csv`` on the server.
     """
-    if file is None or file.filename is None:
+    if file.filename is None:
         return JSONResponse({"error": "no file"}, status_code=400)
     run_id = uuid.uuid4().hex[:12]
     runs_dir = Path("runs")
@@ -51,5 +51,10 @@ async def upload_csv(file: UploadFile = File(...)) -> JSONResponse:
     rows = [ln for ln in raw.splitlines() if ln.strip()]
     row_count = max(0, len(rows) - 1)
     return JSONResponse(
-        {"run_id": run_id, "row_count": row_count, "csv_path": str(out_path), "filename": file.filename}
+        {
+            "run_id": run_id,
+            "row_count": row_count,
+            "csv_path": str(out_path),
+            "filename": file.filename,
+        }
     )

@@ -16,13 +16,15 @@ from kairon.data.io import OHLCV_SCHEMA
 from kairon.features.registry import ALL_FEATURES
 
 # Volume-dependent features that require real volume data
-VOLUME_FEATURES: frozenset[str] = frozenset({
-    "volume.obv",
-    "volume.vwap",
-    "volume.cvd",
-    "volume.vwap_deviation",
-    "volume.volume_imbalance",
-})
+VOLUME_FEATURES: frozenset[str] = frozenset(
+    {
+        "volume.obv",
+        "volume.vwap",
+        "volume.cvd",
+        "volume.vwap_deviation",
+        "volume.volume_imbalance",
+    }
+)
 
 # Known timeframes mapped to their duration in seconds
 TIMEFRAME_SECONDS: dict[str, int] = {
@@ -41,19 +43,19 @@ TIMEFRAME_SECONDS: dict[str, int] = {
 class TimeframeInfo:
     """Auto-detected timeframe metadata."""
 
-    name: str          # e.g. "1w", "1h", "1d"
-    seconds: int       # duration in seconds
-    bar_count: int     # number of bars in the dataset
+    name: str  # e.g. "1w", "1h", "1d"
+    seconds: int  # duration in seconds
+    bar_count: int  # number of bars in the dataset
 
 
 @dataclass(frozen=True, slots=True)
 class LoadResult:
     """Result of loading and validating OHLCV data."""
 
-    table: pa.Table           # Validated OHLCV with OHLCV_SCHEMA
+    table: pa.Table  # Validated OHLCV with OHLCV_SCHEMA
     symbol: str
     timeframe: TimeframeInfo
-    has_volume: bool          # True if volume column has real (non-zero) data
+    has_volume: bool  # True if volume column has real (non-zero) data
 
 
 def detect_timeframe(ts_column: pa.ChunkedArray) -> TimeframeInfo:
@@ -273,8 +275,7 @@ def load_csv(
     if timeframe_override:
         if timeframe_override not in TIMEFRAME_SECONDS:
             raise ValueError(
-                f"Unknown timeframe '{timeframe_override}'. "
-                f"Valid: {list(TIMEFRAME_SECONDS.keys())}"
+                f"Unknown timeframe '{timeframe_override}'. Valid: {list(TIMEFRAME_SECONDS.keys())}"
             )
         tf = TimeframeInfo(
             name=timeframe_override,

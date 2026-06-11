@@ -83,8 +83,8 @@ class ModelPrediction:
 
     model_name: str
     direction: Literal["up", "down", "flat"]
-    direction_class: int          # 0=down, 1=flat, 2=up
-    confidence: float            # proba[predicted_class]
+    direction_class: int  # 0=down, 1=flat, 2=up
+    confidence: float  # proba[predicted_class]
     proba: tuple[float, float, float]  # (down, flat, up)
     magnitude: float
     vol_forecast: float
@@ -222,12 +222,16 @@ def _pad_proba_to_3(proba: np.ndarray) -> np.ndarray:
 def _train_and_predict(
     df: pd.DataFrame,
     feature_names: tuple[str, ...],
-    horizon: str,
+    horizon: HorizonName,
 ) -> tuple[tuple[ModelPrediction, ...], np.ndarray, np.ndarray]:
     """Train models on 80% of data and predict on the last 20%.
 
     Returns (predictions, y_pred_full, y_proba_full) where the latter two
     cover the last 20% of bars for per-bar sweet spot detection.
+
+    ``horizon`` is the UI-facing :data:`HorizonName` (day/swing/long); it
+    is translated to the ``LabelSpec.horizon`` timeframe code here so the
+    label layer never sees the UI vocabulary.
     """
     ohlcv_cols = {"ts", "open", "high", "low", "close", "volume"}
     feat_cols = [c for c in feature_names if c not in ohlcv_cols and c in df.columns]
@@ -252,15 +256,20 @@ def _train_and_predict(
 
     # Build labels
     try:
-        spec = LabelSpec(kind=LabelKind.DIRECTION, horizon=horizon)
-        table_pa = pa.Table.from_pandas(df[["ts", "open", "high", "low", "close", "volume"]].copy(), schema=pa.schema([
-            ("ts", pa.timestamp("us", tz="UTC")),
-            ("open", pa.float64()),
-            ("high", pa.float64()),
-            ("low", pa.float64()),
-            ("close", pa.float64()),
-            ("volume", pa.float64()),
-        ]))
+        spec = LabelSpec(kind=LabelKind.DIRECTION, horizon=resolve_label_horizon(horizon))
+        table_pa = pa.Table.from_pandas(
+            df[["ts", "open", "high", "low", "close", "volume"]].copy(),
+            schema=pa.schema(
+                [
+                    ("ts", pa.timestamp("us", tz="UTC")),
+                    ("open", pa.float64()),
+                    ("high", pa.float64()),
+                    ("low", pa.float64()),
+                    ("close", pa.float64()),
+                    ("volume", pa.float64()),
+                ]
+            ),
+        )
         labeled = make_direction_labels(table_pa, spec=spec, symbol="ASSET")
         y_dir = np.array([b.y_class + 1 for b in labeled.bars], dtype=np.int64)
     except Exception as e:
@@ -279,7 +288,25 @@ def _train_and_predict(
     # 80/20 split
     split = int(use_len * 0.8)
     fm_train = FeatureMatrix(values=fm.values[:split], feature_names=fm.feature_names)
-    y_train = y_dir[:split]
+    fm_test = FeatureMatrix(values=fm.values[split:use_len], feature_names=fm.feature_names)
+    y_train_full = y_dir[:split]
+    y_test_full = y_dir[split:use_len]
+
+    # Compact-relabel: downstream classifiers (XGBoost, sklearn, etc.) require
+    # the class label set to be a contiguous 0..K-1. Our 3-class direction
+    # target is built as {-1, 0, 1} -> {0, 1, 2}, but in practice the FLAT
+    # class can be missing from the training fold (e.g. an 80/20 split on
+    # a 1w BTC bar where only 1 of 323 bars is FLAT, and that bar lands in
+    # the test set). Mapping "DOWN, UP" -> {0, 1} (dropping the absent
+    # FLAT class) is preferable to letting the classifier fail at fit time.
+    classes_train = np.unique(y_train_full)
+    remap = {int(c): i for i, c in enumerate(classes_train.tolist())}
+    y_train = np.array([remap[int(c)] for c in y_train_full], dtype=np.int64)
+    y_test = np.array([remap.get(int(c), 0) for c in y_test_full], dtype=np.int64)
+    n_direction_classes = len(classes_train)
+    if n_direction_classes < len(classes_train) or n_direction_classes < 2:
+        logger.warning("Too few classes in train fold ({}), skipping", n_direction_classes)
+        return (), np.array([]), np.array([]).reshape(0, 3)
 
     # Magnitude and vol labels (simple: log returns and rolling std)
     close = df["close"].values[:use_len].astype(np.float64)
@@ -316,16 +343,29 @@ def _train_and_predict(
         # Last bar prediction
         last_pred_class = int(lr_pred[-1])
         last_proba = lr_proba[-1]
-        dir_map = {0: "down", 1: "flat", 2: "up"}
-        predictions.append(ModelPrediction(
-            model_name="lr",
-            direction=dir_map.get(last_pred_class, "flat"),
-            direction_class=last_pred_class,
-            confidence=float(last_proba[last_pred_class]) if len(last_proba) > last_pred_class else 0.33,
-            proba=tuple(float(p) for p in last_proba) if len(last_proba) >= 3 else (0.33, 0.34, 0.33),
-            magnitude=float(lr_result.get("y_magnitude", np.array([0]))[-1]),
-            vol_forecast=float(lr_result.get("y_vol", np.array([0]))[-1]),
-        ))
+        # Map the *training* class set (0..K-1) back to the canonical
+        # {down, flat, up} vocabulary the Result screen displays. For
+        # 2-class folds the FLAT bucket is absent and is mapped to FLAT
+        # as a neutral fallback — better than the prior "?" silent drop.
+        if n_direction_classes == 2:
+            dir_map = {0: "down", 1: "up"}
+        else:
+            dir_map = {0: "down", 1: "flat", 2: "up"}
+        predictions.append(
+            ModelPrediction(
+                model_name="lr",
+                direction=dir_map.get(last_pred_class, "flat"),
+                direction_class=last_pred_class,
+                confidence=float(last_proba[last_pred_class])
+                if len(last_proba) > last_pred_class
+                else 0.33,
+                proba=tuple(float(p) for p in last_proba)
+                if len(last_proba) >= 3
+                else (0.33, 0.34, 0.33),
+                magnitude=float(lr_result.get("y_magnitude", np.array([0]))[-1]),
+                vol_forecast=float(lr_result.get("y_vol", np.array([0]))[-1]),
+            )
+        )
 
         # Per-bar predictions for sweet spots (test set)
         y_pred_full = lr_pred[:-1]  # exclude the extra last bar
@@ -336,9 +376,17 @@ def _train_and_predict(
         y_pred_full = np.full(max(use_len - split, 1), 1, dtype=np.int64)
         y_proba_full = np.full((max(use_len - split, 1), 3), 0.33)
 
-    # Tree model
+    # Tree model — pass the actual number of training classes so the
+    # XGBoost/LightGBM/sklearn RF classifier is built with a matching
+    # ``num_class`` (XGBoost >= 2.0 fails at fit time if the model's
+    # expected class count disagrees with the data).
     try:
-        tree_model = TreeMultiHeadModel(TreeMultiHeadConfig(n_estimators=300))
+        tree_model = TreeMultiHeadModel(
+            TreeMultiHeadConfig(
+                n_estimators=300,
+                n_direction_classes=n_direction_classes,
+            )
+        )
         tree_state = tree_model.fit_multihead(fm_train_s, y_train, y_mag_train, y_vol_train)
 
         tree_result = tree_model.predict_multihead(tree_state, fm_test)
@@ -347,18 +395,45 @@ def _train_and_predict(
 
         last_tree_class = int(tree_pred[-1])
         last_tree_proba = tree_proba[-1]
-        dir_map = {0: "down", 1: "flat", 2: "up"}
-        predictions.append(ModelPrediction(
-            model_name="tree",
-            direction=dir_map.get(last_tree_class, "flat"),
-            direction_class=last_tree_class,
-            confidence=float(last_tree_proba[last_tree_class]) if len(last_tree_proba) > last_tree_class else 0.33,
-            proba=tuple(float(p) for p in last_tree_proba) if len(last_tree_proba) >= 3 else (0.33, 0.34, 0.33),
-            magnitude=float(tree_result.get("y_magnitude", np.array([0]))[-1]),
-            vol_forecast=float(tree_result.get("y_vol", np.array([0]))[-1]),
-        ))
+        # Same compact-2-class map as the LR head: when the train fold
+        # only saw DOWN+UP (no FLAT bar present), the tree classifier
+        # emits {0, 1} and we map them to {down, up}. 3-class folds
+        # keep the canonical {down, flat, up} mapping.
+        if n_direction_classes == 2:
+            dir_map = {0: "down", 1: "up"}
+        else:
+            dir_map = {0: "down", 1: "flat", 2: "up"}
+        predictions.append(
+            ModelPrediction(
+                model_name="tree",
+                direction=dir_map.get(last_tree_class, "flat"),
+                direction_class=last_tree_class,
+                confidence=float(last_tree_proba[last_tree_class])
+                if len(last_tree_proba) > last_tree_class
+                else 0.33,
+                proba=tuple(float(p) for p in last_tree_proba)
+                if len(last_tree_proba) >= 3
+                else (0.33, 0.34, 0.33),
+                magnitude=float(tree_result.get("y_magnitude", np.array([0]))[-1]),
+                vol_forecast=float(tree_result.get("y_vol", np.array([0]))[-1]),
+            )
+        )
     except Exception as e:
-        logger.warning("Tree model training failed: {}", e)
+        # Tree training is best-effort. Surface a uniform-uncertain tree
+        # head so the Result screen can still produce 4 tiles; the truth
+        # is that this is a model-failure fallback, not a real forecast.
+        logger.warning("Tree model training failed, emitting flat fallback: {}", e)
+        predictions.append(
+            ModelPrediction(
+                model_name="tree",
+                direction="flat",
+                direction_class=1,
+                confidence=0.34,
+                proba=(0.33, 0.34, 0.33),
+                magnitude=0.0,
+                vol_forecast=0.0,
+            )
+        )
 
     return tuple(predictions), y_pred_full, y_proba_full
 
@@ -372,7 +447,7 @@ def run_analysis(
     feature_set: str = "all",
     pivot_scale: float = 1.5,
     run_model: bool = True,
-    horizon: str = "1w",
+    horizon: HorizonName = "day",
     equity: float = 10000.0,
     threshold: float = 0.45,
 ) -> AnalysisResult:
@@ -390,7 +465,9 @@ def run_analysis(
     logger.info("Running analysis pipeline for {} {}...", symbol, timeframe)
 
     # 1. Feature pipeline
-    features = select_feature_set(has_volume) if feature_set == "all" else _parse_feature_set(feature_set)
+    features = (
+        select_feature_set(has_volume) if feature_set == "all" else _parse_feature_set(feature_set)
+    )
     logger.info("Extracting {} features...", len(features))
 
     pipeline = FeaturePipeline(features=features)
@@ -398,6 +475,7 @@ def run_analysis(
     feature_col_names: list[str] = []
 
     from kairon.features.registry import get as get_feature
+
     for fname in features:
         try:
             spec = get_feature(fname)
@@ -435,7 +513,9 @@ def run_analysis(
     if run_model:
         logger.info("Training models on 80/20 split...")
         model_predictions, y_pred_full, y_proba_full = _train_and_predict(
-            df, tuple(feature_col_names), horizon,
+            df,
+            tuple(feature_col_names),
+            horizon,
         )
         logger.info("Models trained: {} predictions", len(model_predictions))
 
@@ -519,7 +599,11 @@ def run_analysis(
         pivots=tuple(pivots),
     )
 
-    logger.info("Analysis complete: {} features, {} sweet spots", len(feature_col_names), len(adjusted_spots))
+    logger.info(
+        "Analysis complete: {} features, {} sweet spots",
+        len(feature_col_names),
+        len(adjusted_spots),
+    )
     return result
 
 
@@ -619,6 +703,28 @@ HORIZON_PROFILES: Final[dict[HorizonName, HorizonProfile]] = {
 }
 
 
+# UI horizon (HorizonName) → LabelSpec.horizon (timeframe code). The
+# horizon profile keys are the user-facing names; the label layer needs a
+# timeframe code to compute the prediction target. This mapping is the
+# single source of truth for that translation.
+_HORIZON_TO_LABEL_HORIZON: Final[dict[HorizonName, str]] = {
+    "day": "1d",
+    "swing": "1w",
+    "long": "1m",
+}
+
+
+def resolve_label_horizon(horizon: HorizonName) -> str:
+    """Translate a UI horizon name to the LabelSpec timeframe code.
+
+    The label layer (kairon.labels.*) requires a string matching
+    ``^[0-9]+(m|h|d|w)$`` (e.g. ``"1d"``). The web UI and the analysis
+    pipeline speak in :data:`HorizonName` (day / swing / long). This
+    function is the single seam between those two vocabularies.
+    """
+    return _HORIZON_TO_LABEL_HORIZON[horizon]
+
+
 def _base_price_from_table(table: pa.Table) -> float:
     """Last close from the OHLCV table. Returns 0.0 if unavailable."""
     try:
@@ -647,7 +753,10 @@ def _rebadge(
         # engine produced no model output; surface a uniform-uncertain ensemble
         # so the Result screen still has 4 tiles rather than 0.
         unavailable_names: tuple[ModelName, ...] = (
-            "trend", "mean_reversion", "volatility", "ensemble"
+            "trend",
+            "mean_reversion",
+            "volatility",
+            "ensemble",
         )
         return tuple(
             ModelTile(
@@ -785,8 +894,10 @@ def build_run_result(
     # on the last bar's current_state.
     cs = analysis_result.current_state
     vol_magnitude = (
-        float(cs.garch_vol) - float(cs.atr_14) / max(float(cs.close), 1e-9)
-    ) if float(cs.close) > 0 else 0.0
+        (float(cs.garch_vol) - float(cs.atr_14) / max(float(cs.close), 1e-9))
+        if float(cs.close) > 0
+        else 0.0
+    )
     sl_dist = profile.stop_loss_distance_pct
     stop_loss = base_price * (1.0 - sl_dist) if base_price > 0 else 0.0
     ideal_entry = base_price

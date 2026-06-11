@@ -28,25 +28,35 @@ class SweetSpot:
     timestamp: datetime
     price: float
     direction: Literal["BUY", "SELL"]
-    model_confidence: float            # proba[predicted_class] from multi-head model
-    model_direction: int               # predicted class: 0=down, 1=flat, 2=up
-    combined_score: float              # model_confidence + corroboration (bounded 0-1)
-    timing_horizon: str                # "immediate", "near-term", "medium-term", "long-term"
-    justifications: tuple[str, ...]   # Human-readable reasons
+    model_confidence: float  # proba[predicted_class] from multi-head model
+    model_direction: int  # predicted class: 0=down, 1=flat, 2=up
+    combined_score: float  # model_confidence + corroboration (bounded 0-1)
+    timing_horizon: str  # "immediate", "near-term", "medium-term", "long-term"
+    justifications: tuple[str, ...]  # Human-readable reasons
     corroboration: tuple[tuple[str, float], ...]  # (feature_name, adjustment_value)
 
 
 # Timeframe to deduplication lookback mapping
 _DEDUP_LOOKBACK: dict[str, int] = {
-    "1m": 20, "5m": 20, "15m": 10, "30m": 10,
-    "1h": 10, "4h": 5, "1d": 5, "1w": 3,
+    "1m": 20,
+    "5m": 20,
+    "15m": 10,
+    "30m": 10,
+    "1h": 10,
+    "4h": 5,
+    "1d": 5,
+    "1w": 3,
 }
 
 # Timeframe to timing horizon mapping
 _TIMING_HORIZON: dict[str, str] = {
-    "1m": "immediate", "5m": "immediate",
-    "15m": "near-term", "30m": "near-term", "1h": "near-term",
-    "4h": "medium-term", "1d": "medium-term",
+    "1m": "immediate",
+    "5m": "immediate",
+    "15m": "near-term",
+    "30m": "near-term",
+    "1h": "near-term",
+    "4h": "medium-term",
+    "1d": "medium-term",
     "1w": "long-term",
 }
 
@@ -70,20 +80,26 @@ def _check_buy_conditions(
     ew_dir = row.get("ew_wave_direction", 0.0)
     ew_imp = row.get("ew_is_impulse", 0.0)
     if ew_imp > 0.5 and ew_dir > 0.5 and ew_pos in (2.0, 4.0):
-        conditions.append((
-            True, 0.04,
-            f"In bullish impulse wave W{int(ew_pos)} - pullback buying opportunity",
-        ))
+        conditions.append(
+            (
+                True,
+                0.04,
+                f"In bullish impulse wave W{int(ew_pos)} - pullback buying opportunity",
+            )
+        )
     else:
         conditions.append((False, 0.0, ""))
 
     # 2. EW correction ending (completion_prob > 0.6, not impulse, direction not bearish)
     ew_comp = row.get("ew_completion_prob", 0.0)
     if ew_comp > 0.6 and ew_imp < 0.5 and ew_dir > -0.5:
-        conditions.append((
-            True, 0.04,
-            f"Corrective wave ending (prob={ew_comp:.0%}) - reversal expected",
-        ))
+        conditions.append(
+            (
+                True,
+                0.04,
+                f"Corrective wave ending (prob={ew_comp:.0%}) - reversal expected",
+            )
+        )
     else:
         conditions.append((False, 0.0, ""))
 
@@ -91,10 +107,13 @@ def _check_buy_conditions(
     fib_618 = abs(row.get("fib_dist_618", 99.0))
     fib_786 = abs(row.get("fib_dist_786", 99.0))
     if fib_618 < 0.5 or fib_786 < 0.5:
-        conditions.append((
-            True, 0.03,
-            f"Near Fibonacci support (Fib618 dist={fib_618:.2f} ATR)",
-        ))
+        conditions.append(
+            (
+                True,
+                0.03,
+                f"Near Fibonacci support (Fib618 dist={fib_618:.2f} ATR)",
+            )
+        )
     else:
         conditions.append((False, 0.0, ""))
 
@@ -102,10 +121,13 @@ def _check_buy_conditions(
     fvg_bull = row.get("fvg_bullish", 0.0)
     fvg_fill = row.get("fvg_fill_pct", 1.0)
     if fvg_bull > 0.5 and fvg_fill < 0.3:
-        conditions.append((
-            True, 0.03,
-            f"Unfilled bullish Fair Value Gap ({1 - fvg_fill:.0%} remaining)",
-        ))
+        conditions.append(
+            (
+                True,
+                0.03,
+                f"Unfilled bullish Fair Value Gap ({1 - fvg_fill:.0%} remaining)",
+            )
+        )
     else:
         conditions.append((False, 0.0, ""))
 
@@ -133,10 +155,13 @@ def _check_buy_conditions(
     # 8. Trending regime
     regime_trend = row.get("regime_prob_trending", 0.0)
     if regime_trend > 0.5:
-        conditions.append((
-            True, 0.02,
-            f"Trending regime (prob={regime_trend:.0%}) - momentum supported",
-        ))
+        conditions.append(
+            (
+                True,
+                0.02,
+                f"Trending regime (prob={regime_trend:.0%}) - momentum supported",
+            )
+        )
     else:
         conditions.append((False, 0.0, ""))
 
@@ -158,20 +183,26 @@ def _check_sell_conditions(
     ew_dir = row.get("ew_wave_direction", 0.0)
     ew_imp = row.get("ew_is_impulse", 0.0)
     if ew_imp > 0.5 and ew_dir < -0.5 and ew_pos in (3.0, 5.0):
-        conditions.append((
-            True, 0.04,
-            f"In bearish impulse wave W{int(ew_pos)} - selling pressure",
-        ))
+        conditions.append(
+            (
+                True,
+                0.04,
+                f"In bearish impulse wave W{int(ew_pos)} - selling pressure",
+            )
+        )
     else:
         conditions.append((False, 0.0, ""))
 
     # 2. EW impulse ending
     ew_comp = row.get("ew_completion_prob", 0.0)
     if ew_comp > 0.6 and ew_imp > 0.5 and ew_dir < 0.5:
-        conditions.append((
-            True, 0.04,
-            f"Impulse wave ending (prob={ew_comp:.0%}) - reversal risk",
-        ))
+        conditions.append(
+            (
+                True,
+                0.04,
+                f"Impulse wave ending (prob={ew_comp:.0%}) - reversal risk",
+            )
+        )
     else:
         conditions.append((False, 0.0, ""))
 
@@ -187,10 +218,13 @@ def _check_sell_conditions(
     fvg_bear = row.get("fvg_bearish", 0.0)
     fvg_fill = row.get("fvg_fill_pct", 1.0)
     if fvg_bear > 0.5 and fvg_fill < 0.3:
-        conditions.append((
-            True, 0.03,
-            f"Unfilled bearish Fair Value Gap ({1 - fvg_fill:.0%} remaining)",
-        ))
+        conditions.append(
+            (
+                True,
+                0.03,
+                f"Unfilled bearish Fair Value Gap ({1 - fvg_fill:.0%} remaining)",
+            )
+        )
     else:
         conditions.append((False, 0.0, ""))
 
@@ -219,10 +253,13 @@ def _check_sell_conditions(
     regime_stressed = row.get("regime_prob_stressed", 0.0)
     regime_volatile = row.get("regime_prob_volatile", 0.0)
     if regime_stressed > 0.3 or regime_volatile > 0.4:
-        conditions.append((
-            True, 0.02,
-            f"Stressed/volatile regime - elevated risk",
-        ))
+        conditions.append(
+            (
+                True,
+                0.02,
+                f"Stressed/volatile regime - elevated risk",
+            )
+        )
     else:
         conditions.append((False, 0.0, ""))
 
@@ -273,7 +310,7 @@ def detect_sweet_spots(
     bos_direction = df.get("bos", pd.Series([0] * n, dtype=int))
     bos_window: dict[int, int] = {}
     for i in range(n):
-        recent = bos_direction.iloc[max(0, i - 4): i + 1]
+        recent = bos_direction.iloc[max(0, i - 4) : i + 1]
         if (recent == 1).any():
             bos_window[i] = 1
         elif (recent == -1).any():
@@ -360,18 +397,20 @@ def detect_sweet_spots(
         if isinstance(ts_val, pd.Timestamp):
             ts_val = ts_val.to_pydatetime()
 
-        raw_spots.append(SweetSpot(
-            bar_index=i,
-            timestamp=ts_val,
-            price=float(row_dict.get("close", 0)),
-            direction=direction,
-            model_confidence=base_confidence,
-            model_direction=model_dir_class,
-            combined_score=combined_score,
-            timing_horizon=timing,
-            justifications=tuple(justifications),
-            corroboration=tuple(corroboration),
-        ))
+        raw_spots.append(
+            SweetSpot(
+                bar_index=i,
+                timestamp=ts_val,
+                price=float(row_dict.get("close", 0)),
+                direction=direction,
+                model_confidence=base_confidence,
+                model_direction=model_dir_class,
+                combined_score=combined_score,
+                timing_horizon=timing,
+                justifications=tuple(justifications),
+                corroboration=tuple(corroboration),
+            )
+        )
 
     # Deduplicate: keep highest combined_score in each lookback window per direction
     deduped: list[SweetSpot] = []

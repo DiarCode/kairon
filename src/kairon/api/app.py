@@ -13,11 +13,28 @@ new ``kairon.ui.web.screens`` package.
 
 from __future__ import annotations
 
+import contextlib
 import importlib
+import importlib.util
 import time
 from datetime import UTC
 from pathlib import Path
 from typing import Any
+
+# IMPORTANT: DTOs are imported at module scope (not inside create_app) so
+# FastAPI 0.136+ can resolve the string annotations produced by
+# ``from __future__ import annotations``. Importing them lazily inside
+# create_app causes FastAPI to misclassify BaseModel parameters as
+# query parameters, returning 422 on every POST.
+from kairon.api.dto import (
+    BacktestRequest,
+    BacktestResponse,
+    HealthResponse,
+    PredictRequest,
+    PredictResponse,
+    TrainRequest,
+    TrainResponse,
+)
 
 
 def _has_fastapi() -> bool:
@@ -33,21 +50,10 @@ def create_app() -> Any:
     surface that the integration tests can pin against.
     """
     if not _has_fastapi():
-        raise ImportError(
-            "fastapi is not installed; install with `uv sync --extra api`"
-        )
+        raise ImportError("fastapi is not installed; install with `uv sync --extra api`")
     fastapi = importlib.import_module("fastapi")
     starlette_static = importlib.import_module("starlette.staticfiles")
 
-    from kairon.api.dto import (
-        BacktestRequest,
-        BacktestResponse,
-        HealthResponse,
-        PredictRequest,
-        PredictResponse,
-        TrainRequest,
-        TrainResponse,
-    )
     from kairon.models.registry import available_models
     from kairon.store.runs import RunStore
     from kairon.ui.web import get_charts_dir, get_web_dir
@@ -95,6 +101,13 @@ def create_app() -> Any:
         upload_screen,
     )
 
+    # Root redirect → the entry screen of the analysis flow.
+    from starlette.responses import RedirectResponse
+
+    async def _root_redirect() -> Any:
+        return RedirectResponse(url="/upload")
+
+    app.add_api_route("/", _root_redirect, methods=["GET"], tags=["web"])
     app.add_api_route("/upload", upload_screen, methods=["GET"], tags=["web"])
     app.add_api_route("/configure", configure_screen, methods=["GET"], tags=["web"])
     app.add_api_route("/analyze", analyze_screen, methods=["GET"], tags=["web"])
@@ -109,12 +122,15 @@ def create_app() -> Any:
     # The verifier polls the runs table for due rows; the ccxt fetch is
     # mocked in tests via the _ccxt_client seam, and the run_once function
     # is exercised directly in test_verification_thread.py.
-    import contextlib
-
     from kairon.live.feed import fetch_current_price
     from kairon.store.verifier import VerifierThread
 
-    @contextlib.asynccontextmanager
+    # ``@contextlib.asynccontextmanager`` expects a regular generator and
+    # pyright's overloads in typeshed don't model the async-generator form
+    # cleanly, so we silence the decorator and cast the result to FastAPI's
+    # expected AsyncContextManager shape. The runtime contract is: ``lifespan``
+    # is an async generator that yields once and stops the thread on exit.
+    @contextlib.asynccontextmanager  # type: ignore[arg-type]
     async def lifespan(_app: Any) -> Any:
         thread = VerifierThread(
             run_store=app.state.run_store,
@@ -123,11 +139,14 @@ def create_app() -> Any:
         )
         thread.start()
         try:
-            yield
+            yield None
         finally:
             thread.stop(timeout=2.0)
 
-    app.router.lifespan_context = lifespan
+    import typing
+    from contextlib import AbstractAsyncContextManager
+
+    app.router.lifespan_context = typing.cast("AbstractAsyncContextManager[None]", lifespan)
 
     started_at = time.time()
 
@@ -163,9 +182,7 @@ def create_app() -> Any:
         """Predict. Stand-in: returns an empty prediction until the
         model registry is wired in Phase 12.
         """
-        from datetime import datetime, timezone
-
-        now = datetime.now(UTC)
+        now = datetime_now_utc()
         return PredictResponse(
             run_name=req.run_name,
             backend="",
@@ -194,6 +211,14 @@ def create_app() -> Any:
         )
 
     return app
+
+
+def datetime_now_utc():
+    """Return tz-aware UTC ``datetime.now()``. Indirected so tests can
+    monkey-patch without rewiring the closure."""
+    from datetime import datetime
+
+    return datetime.now(UTC)
 
 
 __all__ = ["create_app"]

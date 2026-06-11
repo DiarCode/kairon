@@ -31,7 +31,8 @@ COPY src ./src
 COPY assets ./assets
 COPY README.md ./
 COPY entrypoint.sh ./entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+# Strip any CRLF that checked out on Windows — shebang with \r breaks exec().
+RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 RUN uv sync --extra api --extra web --extra cli --extra ml
 
 # The kairon CLI is installed via [project.scripts] in pyproject.toml.

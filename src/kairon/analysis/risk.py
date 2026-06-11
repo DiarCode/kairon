@@ -9,18 +9,18 @@ from dataclasses import dataclass
 class RiskLevels:
     """Stop-loss, take-profit, and position sizing for the current bar."""
 
-    stop_loss_long: float          # 2x ATR below current price
-    stop_loss_short: float         # 2x ATR above current price
-    stop_loss_long_tight: float    # 1.5x ATR below current price
-    stop_loss_short_tight: float   # 1.5x ATR above current price
-    take_profit_long_1: float     # 2x ATR above (1:1 R:R for longs)
-    take_profit_long_2: float     # 3x ATR above (1:1.5 R:R for longs)
-    take_profit_short_1: float    # 2x ATR below (1:1 R:R for shorts)
-    take_profit_short_2: float    # 3x ATR below (1:1.5 R:R for shorts)
-    fib_tp_long: float            # Fibonacci 1.618 extension above
-    fib_tp_short: float           # Fibonacci 1.618 extension below
-    position_size_pct: float      # As fraction of equity (0.005-0.02)
-    atr: float                    # ATR(14) value used for calculations
+    stop_loss_long: float  # 2x ATR below current price
+    stop_loss_short: float  # 2x ATR above current price
+    stop_loss_long_tight: float  # 1.5x ATR below current price
+    stop_loss_short_tight: float  # 1.5x ATR above current price
+    take_profit_long_1: float  # 2x ATR above (1:1 R:R for longs)
+    take_profit_long_2: float  # 3x ATR above (1:1.5 R:R for longs)
+    take_profit_short_1: float  # 2x ATR below (1:1 R:R for shorts)
+    take_profit_short_2: float  # 3x ATR below (1:1.5 R:R for shorts)
+    fib_tp_long: float  # Fibonacci 1.618 extension above
+    fib_tp_short: float  # Fibonacci 1.618 extension below
+    position_size_pct: float  # As fraction of equity (0.005-0.02)
+    atr: float  # ATR(14) value used for calculations
 
 
 def calculate_risk_levels(
@@ -82,7 +82,7 @@ def calculate_risk_levels(
     if garch_vol > 0.05:
         position_size_pct *= 0.75  # Reduce by 25% in high volatility
     elif garch_vol > 0.03:
-        position_size_pct *= 0.9   # Reduce by 10% in moderate volatility
+        position_size_pct *= 0.9  # Reduce by 10% in moderate volatility
 
     return RiskLevels(
         stop_loss_long=sl_long,

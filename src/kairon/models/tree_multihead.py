@@ -122,7 +122,8 @@ def _build_direction_classifier(config: TreeMultiHeadConfig, backend: str):
     """Build a direction classifier for the given backend."""
     if backend == "xgboost":
         xgb = importlib.import_module("xgboost")
-        return xgb.XGBClassifier(
+        n_classes = config.n_direction_classes
+        xgb_kwargs: dict[str, Any] = dict(
             n_estimators=config.n_estimators,
             max_depth=config.max_depth,
             learning_rate=config.learning_rate,
@@ -134,9 +135,17 @@ def _build_direction_classifier(config: TreeMultiHeadConfig, backend: str):
             tree_method="hist",
             n_jobs=-1,
             random_state=config.random_state,
-            objective="multi:softprob" if config.n_direction_classes > 2 else "binary:logistic",
-            eval_metric="mlogloss" if config.n_direction_classes > 2 else "logloss",
+            objective="multi:softprob" if n_classes > 2 else "binary:logistic",
+            eval_metric="mlogloss" if n_classes > 2 else "logloss",
         )
+        # XGBoost >= 2.0 does not always infer ``num_class`` correctly at fit
+        # time when the training fold happens to contain only a subset of the
+        # global class set (e.g. an 80/20 split where the test fold only has
+        # DOWN+UP). Pinning the expected class count to the config's value
+        # makes the classifier accept the full {-1,0,1} -> {0,1,2} label set.
+        if n_classes > 2:
+            xgb_kwargs["num_class"] = n_classes
+        return xgb.XGBClassifier(**xgb_kwargs)
     elif backend == "lightgbm":
         lgb = importlib.import_module("lightgbm")
         n_classes = config.n_direction_classes
