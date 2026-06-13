@@ -1,52 +1,169 @@
 {% extends "layout.html" %}
 {% block body %}
 <section class="kairon-glass-card kairon-screen">
-    <h1 class="kairon-screen-title">Upload</h1>
-    <form id="upload-form" method="post" action="/api/uploads" enctype="multipart/form-data">
-        <div class="kairon-drop-zone" id="kairon-drop-zone">
-            <p>Drop a TradingView CSV here, or <label class="kairon-text-link" for="csv-input">choose a file</label>.</p>
-            <input id="csv-input" type="file" name="file" accept=".csv,text/csv" hidden />
+    <h1 class="kairon-screen-title">Analyze</h1>
+
+    <!-- Drop zone — always visible until file is uploaded -->
+    <div class="kairon-drop-zone" id="kairon-drop-zone">
+        <p>Drop a TradingView CSV here, or <label class="kairon-text-link" for="csv-input">choose a file</label>.</p>
+        <input id="csv-input" type="file" name="file" accept=".csv,text/csv" hidden />
+    </div>
+
+    <!-- Upload status — shows after file is selected -->
+    <div id="upload-status" class="kairon-upload-status">
+        {% if filename %}<p>Selected: <code>{{ filename }}</code> ({{ row_count }} rows)</p>{% endif %}
+    </div>
+
+    <!-- Horizon picker — hidden until file is uploaded -->
+    <div id="horizon-section" hidden>
+        <div class="kairon-horizon-tiles" id="horizon-tiles">
+            <label class="kairon-bento-tile kairon-horizon-tile">
+                <input type="radio" name="horizon" value="day" checked />
+                <span class="kairon-horizon-pill kairon-horizon-pill--day">day</span>
+                <span class="kairon-horizon-desc">24h ahead</span>
+            </label>
+            <label class="kairon-bento-tile kairon-horizon-tile">
+                <input type="radio" name="horizon" value="swing" />
+                <span class="kairon-horizon-pill kairon-horizon-pill--swing">swing</span>
+                <span class="kairon-horizon-desc">5–7d ahead</span>
+            </label>
+            <label class="kairon-bento-tile kairon-horizon-tile">
+                <input type="radio" name="horizon" value="long" />
+                <span class="kairon-horizon-pill kairon-horizon-pill--long">long</span>
+                <span class="kairon-horizon-desc">30–90d ahead</span>
+            </label>
         </div>
-        <div id="upload-status" class="kairon-upload-status">
-            {% if filename %}<p>Selected: <code>{{ filename }}</code> ({{ row_count }} rows)</p>{% endif %}
+        <div class="kairon-button-center">
+            <button id="analyze-btn" type="button" class="kairon-primary-button">Analyze</button>
         </div>
-        <button id="analyze-btn" type="button" class="kairon-primary-button" aria-disabled="true" disabled>
-            Analyze
-        </button>
-    </form>
+    </div>
+
+    <!-- Progress ring — hidden until Analyze is clicked -->
+    <div id="progress-section" hidden>
+        <div class="kairon-progress-ring" role="progressbar" aria-valuemin="0" aria-valuemax="4" aria-valuenow="0" id="progress-ring">
+            <div class="kairon-progress-ring-stage" id="progress-stage">Parsing CSV</div>
+        </div>
+        <div class="kairon-button-center">
+            <a class="kairon-text-link" href="/upload">cancel</a>
+        </div>
+    </div>
+
+    <!-- Error display -->
+    <div id="error-section" hidden>
+        <p id="error-message" style="font-weight:600"></p>
+        <div class="kairon-button-center">
+            <a class="kairon-text-link" href="/upload">Try again</a>
+        </div>
+    </div>
+
     <script>
-        (function() {
-            const input = document.getElementById('csv-input');
-            const drop = document.getElementById('kairon-drop-zone');
-            const status = document.getElementById('upload-status');
-            const btn = document.getElementById('analyze-btn');
-            let runId = null;
-            function enable() { btn.disabled = false; btn.removeAttribute('aria-disabled'); }
-            function disable() { btn.disabled = true; btn.setAttribute('aria-disabled', 'true'); }
-            async function upload(file) {
-                const fd = new FormData();
-                fd.append('file', file);
-                const r = await fetch('/api/uploads', { method: 'POST', body: fd });
-                if (!r.ok) { status.textContent = 'Upload failed.'; return; }
-                const j = await r.json();
+    (function() {
+        var input = document.getElementById('csv-input');
+        var drop = document.getElementById('kairon-drop-zone');
+        var status = document.getElementById('upload-status');
+        var btn = document.getElementById('analyze-btn');
+        var horizonSection = document.getElementById('horizon-section');
+        var progressSection = document.getElementById('progress-section');
+        var progressRing = document.getElementById('progress-ring');
+        var progressStage = document.getElementById('progress-stage');
+        var errorSection = document.getElementById('error-section');
+        var errorMessage = document.getElementById('error-message');
+        var runId = null;
+
+        /* --- Upload handler --- */
+        function enable() { btn.disabled = false; btn.removeAttribute('aria-disabled'); }
+        function disable() { btn.disabled = true; btn.setAttribute('aria-disabled', 'true'); }
+
+        async function upload(file) {
+            var fd = new FormData();
+            fd.append('file', file);
+            try {
+                var r = await fetch('/api/uploads', { method: 'POST', body: fd });
+                if (!r.ok) {
+                    var err = await r.json().catch(function() { return { error: 'Upload failed' }; });
+                    showError(err.error || 'Upload failed');
+                    return;
+                }
+                var j = await r.json();
                 runId = j.run_id;
-                status.innerHTML = '<p>Selected: <code>' + file.name + '</code> (' + j.row_count + ' rows)</p>';
+                status.innerHTML = '<p>Uploaded: <code>' + file.name + '</code> (' + j.row_count + ' rows)</p>';
+                drop.hidden = true;
+                horizonSection.hidden = false;
                 enable();
+            } catch (e) {
+                showError('Network error: ' + e.message);
             }
-            input.addEventListener('change', e => { if (e.target.files[0]) upload(e.target.files[0]); });
-            ['dragover','dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); }));
-            drop.addEventListener('drop', e => {
-                e.preventDefault();
-                const f = e.dataTransfer.files[0];
-                if (f) upload(f);
-            });
-            btn.addEventListener('click', () => {
-                if (!runId) return;
-                // stash run_id in localStorage for the next screen
-                try { localStorage.setItem('kairon:run_id', runId); } catch (_) {}
-                window.location.href = '/configure?run_id=' + encodeURIComponent(runId);
-            });
-        })();
+        }
+
+        input.addEventListener('change', function(e) {
+            if (e.target.files[0]) upload(e.target.files[0]);
+        });
+        ['dragover', 'dragenter'].forEach(function(ev) {
+            drop.addEventListener(ev, function(e) { e.preventDefault(); });
+        });
+        drop.addEventListener('drop', function(e) {
+            e.preventDefault();
+            var f = e.dataTransfer.files[0];
+            if (f) upload(f);
+        });
+
+        /* --- Analyze handler --- */
+        btn.addEventListener('click', async function() {
+            if (!runId) return;
+            var horizon = (document.querySelector('input[name="horizon"]:checked') || {}).value || 'day';
+            disable();
+            horizonSection.hidden = true;
+            progressSection.hidden = false;
+
+            try {
+                var r = await fetch('/api/runs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ run_id: runId, horizon: horizon })
+                });
+                if (!r.ok) {
+                    var err = await r.json().catch(function() { return { error: 'Run failed' }; });
+                    showError(err.error || 'Run failed');
+                    return;
+                }
+            } catch (e) {
+                showError('Network error: ' + e.message);
+                return;
+            }
+
+            /* Cosmetic progress cycle — v1 runs synchronously */
+            var stages = [
+                ['parsing', 'Parsing CSV'],
+                ['features', 'Computing features'],
+                ['predicting', 'Predicting'],
+                ['rendering', 'Rendering'],
+                ['done', 'Done']
+            ];
+            var i = 0;
+            function tick() {
+                if (i >= stages.length) return;
+                progressStage.textContent = stages[i][1];
+                progressRing.setAttribute('aria-valuenow', String(i));
+                i += 1;
+                if (i < stages.length) {
+                    setTimeout(tick, 500);
+                } else {
+                    setTimeout(function() {
+                        window.location.href = '/result/' + encodeURIComponent(runId) + '?from=upload';
+                    }, 500);
+                }
+            }
+            tick();
+        });
+
+        /* --- Error helper --- */
+        function showError(msg) {
+            progressSection.hidden = true;
+            horizonSection.hidden = true;
+            errorMessage.textContent = msg;
+            errorSection.hidden = false;
+        }
+    })();
     </script>
 </section>
 {% endblock %}

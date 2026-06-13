@@ -6,6 +6,8 @@ A progress ring + the current stage label, plus a small underlined
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
@@ -30,6 +32,21 @@ async def analyze_screen(request: Request) -> HTMLResponse:
 # against Any/cast/type:ignore per AGENTS.md.
 _VALID_HORIZONS: frozenset[str] = frozenset(("day", "swing", "long"))
 
+# Canonical base directory for run data. Mirrors the convention in
+# ``upload_csv`` (which writes to ``<CWD>/runs/<run_id>/input.csv``).
+_RUNS_DIR = Path("runs")
+
+
+def _resolve_csv_path(run_id: str) -> Path:
+    """Return the canonical CSV path for *run_id*.
+
+    The upload handler writes to ``<CWD>/runs/<run_id>/input.csv``.
+    Deriving the path server-side avoids the client needing to know
+    the filesystem layout and eliminates the leading-slash bug where
+    ``/runs/<id>/input.csv`` resolved against the filesystem root.
+    """
+    return _RUNS_DIR / run_id / "input.csv"
+
 
 @router.post("/api/runs")
 async def start_run(request: Request) -> JSONResponse:
@@ -40,7 +57,6 @@ async def start_run(request: Request) -> JSONResponse:
     background this via BackgroundTasks.
     """
     import json
-    from pathlib import Path
 
     from kairon.analysis.engine import build_run_result, run_analysis
     from kairon.analysis.loader import load_csv
@@ -50,9 +66,15 @@ async def start_run(request: Request) -> JSONResponse:
     payload = json.loads(body or b"{}")
     run_id = str(payload.get("run_id", ""))
     raw_horizon = str(payload.get("horizon", "day"))
-    csv_path = Path(str(payload.get("csv_path", "")))
-    if not run_id or not csv_path.exists():
-        return JSONResponse({"error": "missing run_id or csv_path"}, status_code=400)
+
+    if not run_id:
+        return JSONResponse({"error": "missing run_id"}, status_code=400)
+
+    csv_path = _resolve_csv_path(run_id)
+    if not csv_path.exists():
+        return JSONResponse(
+            {"error": f"csv not found for run_id {run_id}"}, status_code=400
+        )
 
     # The horizon comes from the wire as a plain string; build_run_result
     # requires a HorizonName literal. Validate it before passing through.

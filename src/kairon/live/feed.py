@@ -82,6 +82,18 @@ class CcxtCandleFeedConfig(BaseModel):
         le=1_000_000,
         description="Hard cap on per-(symbol,timeframe) buffered buckets.",
     )
+    testnet: bool = Field(
+        default=False,
+        description="If True, connect to the exchange's testnet/sandbox.",
+    )
+    api_key: str = Field(
+        default="",
+        description="API key for authenticated endpoints.",
+    )
+    api_secret: str = Field(
+        default="",
+        description="API secret for authenticated endpoints.",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -143,7 +155,12 @@ class CcxtCandleFeed:
                 )
         self._config = cfg
         self._symbols: tuple[Symbol, ...] = tuple(symbols)
-        self._adapter: CCXTAdapter = adapter or CCXTAdapter(venue=cfg.venue)
+        self._adapter: CCXTAdapter = adapter or CCXTAdapter(
+            venue=cfg.venue,
+            testnet=cfg.testnet,
+            api_key=cfg.api_key,
+            api_secret=cfg.api_secret,
+        )
         self._closed = False
         # In-progress (open) candle per (symbol, timeframe). Each entry
         # is a dict with keys ts, open, high, low, close, volume. A new

@@ -5,15 +5,15 @@ is driven by the token variables in ``tokens.css``; primitives never
 hardcode colors, fonts, or radii.
 
 Primitives:
-- GlassCard         — base container (frosted, no rounding)
-- BentoTile         — sub-tile inside a GlassCard
+- GlassCard         — base container (frosted, 42px radius)
+- BentoTile         — sub-tile inside a GlassCard (32px radius)
 - BigNumber         — extra-large monospace number with unit
-- HorizonPill       — day / swing / long label
+- HorizonPill       — day / swing / long label (24px radius)
 - ChartFrame        — wraps a static PNG (axis labels + 1px border)
 - ModelStripChart   — 30-bar mini chart for a model tile
 - StatusPill        — verification status (hit / missed / pending)
-- PrimaryButton     — blue-500 filled with subtle glow
-- TextLink          — underlined blue-500, no glow
+- PrimaryButton     — white filled with subtle glow (28px radius)
+- TextLink          — underlined text, white + accent on hover
 
 Design deviation: the plan called for 18 files (9 .py + 9 .css). The
 spec only requires the 9 primitives to be exported from a single
@@ -149,7 +149,7 @@ def status_pill(ctx: Context, status: str, *, extra_class: str = "") -> str:
 
 
 # ---------------------------------------------------------------------------
-# PrimaryButton — blue-500 filled with subtle glow
+# PrimaryButton — white filled with subtle glow
 # ---------------------------------------------------------------------------
 
 
@@ -165,7 +165,7 @@ def primary_button(
 
 
 # ---------------------------------------------------------------------------
-# TextLink — underlined blue-500, no glow
+# TextLink — underlined text, white + accent on hover
 # ---------------------------------------------------------------------------
 
 

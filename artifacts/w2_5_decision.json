@@ -1,6 +1,6 @@
 {
   "cost_sensitivity_present": true,
-  "decided_at_iso": "2026-06-11T14:53:15Z",
+  "decided_at_iso": "2026-06-13T16:24:59Z",
   "decision": "PROCEED",
   "max_break_even_pct": 0.55,
   "n_above_escalate": 0,
@@ -9,5 +9,5 @@
   "n_horizons": 1,
   "n_viable": 1,
   "rationale": "max(break_even_pct)=0.5500 across 1 rows (1 assets x 1 horizons). Halt threshold=0.80 (rows above: 0). Escalate threshold=0.80 (rows above: 0). Viable rows: 1/1. Decision=PROCEED. PROCEED: max(break_even_pct) 0.5500 is within the viable band (break_even_pct <= 0.60) and below the 0.80 halt / escalate thresholds on every row; the W2.2 baseline supports proceeding to W3.",
-  "report_path": "C:\\Users\\diar\\AppData\\Local\\Temp\\pytest-of-diar\\pytest-15\\reports\\break_even_w2.md"
+  "report_path": "C:\\Users\\diar\\AppData\\Local\\Temp\\pytest-of-diar\\pytest-56\\reports\\break_even_w2.md"
 }

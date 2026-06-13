@@ -21,9 +21,11 @@ def _register_commands() -> None:
     """Register all CLI subcommands."""
     from kairon.cli.analyze import analyze_app  # noqa: F401
     from kairon.cli.report import report_app  # noqa: F401
+    from kairon.cli.trade import trade_app  # noqa: F401
 
     app.add_typer(analyze_app, name="analyze")
     app.add_typer(report_app, name="report")
+    app.add_typer(trade_app, name="trade")
 
 
 _register_commands()

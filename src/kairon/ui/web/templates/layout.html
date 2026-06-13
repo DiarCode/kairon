@@ -9,11 +9,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Geist:ital,wght@0,100..900;1,100..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap"
         rel="stylesheet"
     />
     <style>
-        html { background: #0A0B0E; }
+        /* Earth background — visible but darkened via the body::before overlay in tokens.css */
         body {
             background-image: url("{{ url_for('kairon-static', path='/image.png') }}");
             background-size: cover;
@@ -21,46 +21,61 @@
             background-repeat: no-repeat;
             background-attachment: fixed;
         }
-        main.kairon-shell {
+        .kairon-shell {
             min-height: 100vh;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             padding: 32px;
+        }
+        .kairon-brand {
+            font-family: var(--font-brand);
+            font-size: 28px;
+            font-weight: 600;
+            color: var(--text);
+            text-align: center;
+            margin-bottom: 24px;
+            letter-spacing: 0.02em;
         }
         .kairon-screen { width: min(900px, 100%); }
         .kairon-screen-title { margin: 0 0 24px 0; font-size: 22px; font-weight: 600; }
         .kairon-drop-zone {
             border: 1px dashed var(--glass-border);
-            border-radius: 0;
+            border-radius: var(--radius-inner);
             padding: 32px;
             text-align: center;
-            color: var(--text-muted);
+            color: var(--text-secondary);
+            font-weight: 400;
+            font-size: 14px;
             margin-bottom: 16px;
         }
         .kairon-horizon-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
         .kairon-horizon-tile { display: flex; flex-direction: column; gap: 8px; cursor: pointer; }
-        .kairon-horizon-desc { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
+        .kairon-horizon-desc { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); font-weight: 400; }
         .kairon-bento { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 16px; }
         .kairon-model-tile { display: flex; flex-direction: column; gap: 8px; }
         .kairon-tile-meta { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-family: var(--font-mono); font-size: 12px; margin: 0; }
-        .kairon-tile-meta dt { color: var(--text-muted); }
+        .kairon-tile-meta dt { color: var(--text-secondary); font-weight: 400; }
         .kairon-tile-meta dd { margin: 0; color: var(--text); text-align: right; }
-        .kairon-actions { display: flex; gap: 12px; align-items: center; margin-top: 16px; }
+        .kairon-actions { display: flex; gap: 12px; align-items: center; justify-content: center; margin-top: 16px; }
+        .kairon-button-center { display: flex; justify-content: center; margin-top: 16px; }
         .kairon-progress-ring {
             display: flex; align-items: center; justify-content: center;
-            height: 160px; margin: 32px 0;
-            border: 2px solid var(--accent); border-radius: 50%;
-            width: 160px; margin-left: auto; margin-right: auto;
+            height: 160px; width: 160px;
+            margin: 32px auto;
+            border: 2px solid var(--accent);
+            border-radius: 50%;
         }
         .kairon-progress-ring-stage { font-family: var(--font-mono); font-size: 14px; color: var(--text); }
         .kairon-track-table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 12px; }
-        .kairon-track-table th { text-align: left; color: var(--text-muted); padding: 8px; border-bottom: 1px solid var(--glass-border); }
+        .kairon-track-table th { text-align: left; color: var(--text-secondary); font-weight: 400; padding: 8px; border-bottom: 1px solid var(--glass-border); }
         .kairon-track-table td { padding: 8px; border-bottom: 1px solid var(--glass-border); }
     </style>
 </head>
 <body>
     <main class="kairon-shell">
+        <div class="kairon-brand">Kairon</div>
         {% block body %}{% endblock %}
     </main>
 </body>

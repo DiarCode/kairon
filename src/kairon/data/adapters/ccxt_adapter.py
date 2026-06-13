@@ -72,23 +72,46 @@ class CCXTAdapter:
         *,
         max_retries: int = 5,
         chunk_ms: int = 30 * 24 * 60 * 60 * 1000,
+        testnet: bool = False,
+        api_key: str = "",
+        api_secret: str = "",
     ) -> None:
         self.venue = venue
         self.max_retries = max_retries
         self.chunk_ms = chunk_ms
+        self.testnet = testnet
+        self.api_key = api_key
+        self.api_secret = api_secret
         self._client: Any = None
 
     def _get_client(self) -> Any:  # noqa: ANN401 - ccxt is not well-typed
         if self._client is None:
             from kairon.data.adapters._ccxt_client import make_client  # noqa: PLC0415 - lazy
 
-            self._client = make_client(self.venue.value)
+            self._client = make_client(
+                self.venue.value,
+                testnet=self.testnet,
+                api_key=self.api_key,
+                api_secret=self.api_secret,
+            )
         return self._client
 
     async def aclose(self) -> None:
         if self._client is not None:
             await self._client.close()
             self._client = None
+
+    def _ccxt_market_id(self, symbol: Symbol) -> str:
+        """Build the ccxt market identifier from a Symbol.
+
+        For perpetual contracts (``is_perp``), ccxt requires the
+        ``BASE/QUOTE:SETTLE`` format (e.g. ``BTC/USDT:USDT``).
+        For spot, the plain ``BASE/QUOTE`` format is used.
+        """
+        base_market = f"{symbol.base}/{symbol.quote}"
+        if symbol.is_perp:
+            return f"{base_market}:{symbol.quote}"
+        return base_market
 
     async def _fetch_chunk(
         self,
@@ -100,7 +123,7 @@ class CCXTAdapter:
         client = self._get_client()
         if timeframe not in CCXT_TIMEFRAMES:
             raise AdapterError(f"unsupported timeframe {timeframe!r}")
-        market = f"{symbol.base}/{symbol.quote}"
+        market = self._ccxt_market_id(symbol)
         last_err: Exception | None = None
         for attempt in range(self.max_retries):
             try:
@@ -256,7 +279,7 @@ class CCXTAdapter:
         if timeframe not in CCXT_TIMEFRAMES:
             raise AdapterError(f"unsupported timeframe {timeframe!r}")
         client = self._get_client()
-        market = f"{symbol.base}/{symbol.quote}"
+        market = self._ccxt_market_id(symbol)
         # ``watch_ohlcv`` returns a list of candles (each is a row) and
         # blocks until the next update arrives. We iterate forever; the
         # caller is responsible for cancellation via :meth:`aclose`.

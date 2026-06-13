@@ -88,7 +88,7 @@ def create_app() -> Any:
     app.state.run_store = RunStore(Path("data/runs.db"))
     app.state.charts_dir = get_charts_dir()
 
-    # Register the 5 web screens + their API endpoints
+    # Register the 6 web screens + their API endpoints
     from kairon.ui.web.screens import (
         analyze_screen,
         configure_screen,
@@ -97,6 +97,13 @@ def create_app() -> Any:
         save_run,
         start_run,
         track_screen,
+        trade_events,
+        trade_halt,
+        trade_orders,
+        trade_positions,
+        trade_screen,
+        trade_status,
+        trade_unhalt,
         upload_csv,
         upload_screen,
     )
@@ -113,10 +120,18 @@ def create_app() -> Any:
     app.add_api_route("/analyze", analyze_screen, methods=["GET"], tags=["web"])
     app.add_api_route("/result/{run_id}", result_screen, methods=["GET"], tags=["web"])
     app.add_api_route("/track", track_screen, methods=["GET"], tags=["web"])
+    app.add_api_route("/trade", trade_screen, methods=["GET"], tags=["web"])
     app.add_api_route("/api/uploads", upload_csv, methods=["POST"], tags=["web"])
     app.add_api_route("/api/runs", start_run, methods=["POST"], tags=["web"])
     app.add_api_route("/api/runs/{run_id}", run_status, methods=["GET"], tags=["web"])
     app.add_api_route("/api/runs/{run_id}/save", save_run, methods=["POST"], tags=["web"])
+    # Trade dashboard API
+    app.add_api_route("/api/trade/status", trade_status, methods=["GET"], tags=["trade"])
+    app.add_api_route("/api/trade/positions", trade_positions, methods=["GET"], tags=["trade"])
+    app.add_api_route("/api/trade/orders", trade_orders, methods=["GET"], tags=["trade"])
+    app.add_api_route("/api/trade/events", trade_events, methods=["GET"], tags=["trade"])
+    app.add_api_route("/api/trade/halt", trade_halt, methods=["POST"], tags=["trade"])
+    app.add_api_route("/api/trade/unhalt", trade_unhalt, methods=["POST"], tags=["trade"])
 
     # Lifespan: start the verifier thread on startup, stop it on shutdown.
     # The verifier polls the runs table for due rows; the ccxt fetch is

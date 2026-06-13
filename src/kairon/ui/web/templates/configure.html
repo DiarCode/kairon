@@ -1,51 +1,9 @@
 {% extends "layout.html" %}
 {% block body %}
 <section class="kairon-glass-card kairon-screen">
-    <h1 class="kairon-screen-title">Configure</h1>
-    <form id="horizon-form" method="get" action="/analyze">
-        <div class="kairon-horizon-tiles" id="horizon-tiles">
-            <label class="kairon-bento-tile kairon-horizon-tile">
-                <input type="radio" name="horizon" value="day" {% if selected == "day" %}checked{% endif %} />
-                <span class="kairon-horizon-pill kairon-horizon-pill--day">day</span>
-                <span class="kairon-horizon-desc">24h ahead</span>
-            </label>
-            <label class="kairon-bento-tile kairon-horizon-tile">
-                <input type="radio" name="horizon" value="swing" {% if selected == "swing" %}checked{% endif %} />
-                <span class="kairon-horizon-pill kairon-horizon-pill--swing">swing</span>
-                <span class="kairon-horizon-desc">5–7d ahead</span>
-            </label>
-            <label class="kairon-bento-tile kairon-horizon-tile">
-                <input type="radio" name="horizon" value="long" {% if selected == "long" %}checked{% endif %} />
-                <span class="kairon-horizon-pill kairon-horizon-pill--long">long</span>
-                <span class="kairon-horizon-desc">30–90d ahead</span>
-            </label>
-        </div>
-        <button id="analyze-btn" type="submit" class="kairon-primary-button">Analyze</button>
-    </form>
-    <script>
-        (function() {
-            const form = document.getElementById('horizon-form');
-            form.addEventListener('submit', async function(e) {
-                e.preventDefault();
-                const params = new URLSearchParams(new FormData(form));
-                const runId = new URLSearchParams(window.location.search).get('run_id') ||
-                              (function(){ try { return localStorage.getItem('kairon:run_id'); } catch(_) { return null; } })();
-                if (!runId) { window.location.href = '/upload'; return; }
-                const fd = new FormData(form);
-                const horizon = fd.get('horizon') || 'day';
-                const r = await fetch('/api/runs', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ run_id: runId, horizon: horizon,
-                                          csv_path: '/runs/' + runId + '/input.csv' })
-                });
-                if (!r.ok) {
-                    document.body.insertAdjacentHTML('beforeend', '<p style="color:#EF4444">Run failed.</p>');
-                    return;
-                }
-                window.location.href = '/result/' + encodeURIComponent(runId) + '?from=analyze';
-            });
-        })();
-    </script>
+    <p>Redirecting to upload…</p>
 </section>
+<script>
+    window.location.href = '/upload';
+</script>
 {% endblock %}

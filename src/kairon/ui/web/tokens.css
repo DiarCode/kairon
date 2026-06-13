@@ -1,25 +1,35 @@
 /* Kairon design tokens — single source of truth for the visual language.
-   No hardcoded colors / fonts / radii anywhere else in the web tree. */
+   No hardcoded colors / fonts / radii anywhere else in the web tree.
+
+   Primary accent: Tailwind blue-500 (#3B82F6) — used for buttons, links,
+   status highlights, and interactive affordances. Text hierarchy uses
+   size/weight differentiation, not opacity or muted colors. */
 
 :root {
     /* surfaces */
     --bg: #0A0B0E;
-    --glass-bg: rgba(255, 255, 255, 0.04);
-    --glass-border: rgba(255, 255, 255, 0.08);
+    --bg-overlay: rgba(0, 0, 0, 0.5);
+    --glass-bg: rgba(255, 255, 255, 0.06);
+    --glass-border: rgba(255, 255, 255, 0.12);
 
-    /* type */
+    /* type — two tiers via size/weight, not opacity */
     --text: #F4F4F5;
-    --text-muted: #A1A1AA;
-    --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --text-secondary: #F4F4F5;   /* same hue, differentiated by size/weight */
+    --font-ui: "Geist", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --font-brand: "Playfair Display", Georgia, serif;
 
-    /* accent + status */
-    --accent: #3B82F6;            /* blue-500 */
-    --negative: #EF4444;          /* desaturated red — NEVER green */
-    --pending: #A1A1AA;
+    /* accent — Tailwind blue-500, the primary action color */
+    --accent: #3B82F6;
+    --negative: #EF4444;
+    --pending: #F4F4F5;
 
-    /* shape — strict, no rounding */
-    --radius: 0;
+    /* shape — rounded hierarchy: outer → inner */
+    --radius-card: 42px;
+    --radius-tile: 32px;
+    --radius-button: 28px;
+    --radius-pill: 24px;
+    --radius-inner: 12px;
 
     /* motion */
     --ease: cubic-bezier(0.4, 0, 0.2, 1);
@@ -29,7 +39,7 @@
 
 * {
     box-sizing: border-box;
-    border-radius: var(--radius);
+    /* No global border-radius — each primitive uses its own token. */
 }
 
 html, body {
@@ -44,14 +54,31 @@ html, body {
     -webkit-font-smoothing: antialiased;
 }
 
-body {
-    /* earth background is set in layout.html as a fixed full-screen img */
-    background-color: var(--bg);
-    overflow-x: hidden;
+/* Darkening overlay — the earth background image is set in layout.html;
+   this pseudo-element sits on top to darken it for text readability. */
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: var(--bg-overlay);
+    z-index: 0;
+    pointer-events: none;
+}
+
+/* Everything inside the shell sits above the overlay */
+.kairon-shell {
+    position: relative;
+    z-index: 1;
 }
 
 a {
     color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+a:hover {
+    color: var(--text);
     text-decoration: none;
 }
 

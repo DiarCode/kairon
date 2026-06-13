@@ -25,9 +25,8 @@ def test_get_configure_returns_200() -> None:
         r = c.get("/configure")
         assert r.status_code == 200
         body = r.text
-        assert "Configure" in body
-        for h in ("day", "swing", "long"):
-            assert h in body
+        # Configure now redirects to /upload via client-side JS
+        assert "Redirecting" in body or "/upload" in body
 
 
 def test_get_analyze_returns_200() -> None:

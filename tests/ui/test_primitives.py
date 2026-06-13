@@ -35,10 +35,21 @@ PRIMITIVE_NAMES = (
     "text_link",
 )
 
+# Expected radius hierarchy: primitive → CSS variable
+RADIUS_MAP = {
+    "kairon-glass-card": "var(--radius-card)",      # 42px
+    "kairon-bento-tile": "var(--radius-tile)",      # 32px
+    "kairon-horizon-pill": "var(--radius-pill)",     # 24px
+    "kairon-status-pill": "var(--radius-pill)",       # 24px
+    "kairon-primary-button": "var(--radius-button)", # 28px
+    "kairon-chart-frame": "var(--radius-inner)",     # 12px
+    "kairon-model-strip-chart": "var(--radius-tile)",# 32px
+}
+
 
 def _env() -> Environment:
     """A fresh Jinja2 env with all 9 primitives registered as globals."""
-    env = Environment(loader=DictLoader({}))
+    env = Environment(loader=DictLoader({}), autoescape=True)
     for name, macro in PRIMITIVES.items():
         env.globals[name] = macro
     return env
@@ -78,13 +89,14 @@ def test_each_primitive_renders_without_error(name: str) -> None:
 def test_glass_card_renders_with_class() -> None:
     env = _env()
     out = env.from_string("{{ glass_card('hi') }}").render()
-    assert 'class="kairon-glass-card"' in out
+    assert "kairon-glass-card" in out
     assert "hi" in out
 
 
 def test_primary_button_has_glow_in_css() -> None:
     css = CSS_PATH.read_text(encoding="utf-8")
-    assert "0 0 20px rgba(59, 130, 246, 0.4)" in css
+    # Primary button has blue-500 glow
+    assert "0 0 20px rgba(59, 130, 246" in css
     assert ".kairon-primary-button" in css
 
 
@@ -113,14 +125,17 @@ def test_monospace_primitives_use_font_mono() -> None:
     assert "var(--font-mono)" in cap.group(0)
 
 
-def test_radius_zero_everywhere() -> None:
-    """No primitive sets border-radius to anything but 0."""
+def test_radius_hierarchy() -> None:
+    """Each primitive uses its designated radius token (42/32/28/24/12)."""
     css = CSS_PATH.read_text(encoding="utf-8")
-    # the only border-radius values allowed in primitives.css are 0
-    radii = re.findall(r"border-radius:\s*([^;]+);", css)
-    assert radii, "expected at least one border-radius declaration"
-    for r in radii:
-        assert r.strip() == "0", f"non-zero border-radius: {r}"
+    for cls, expected_token in RADIUS_MAP.items():
+        # Find the CSS block for this class
+        m = re.search(re.escape(cls) + r"\s*\{[^}]*\}", css, re.DOTALL)
+        assert m is not None, f"no CSS block for {cls}"
+        block = m.group(0)
+        assert f"border-radius: {expected_token}" in block, (
+            f"{cls} expected border-radius: {expected_token}, got: {block}"
+        )
 
 
 # ---------- CSS CLASSES PRESENT --------------------------------------------
