@@ -193,9 +193,15 @@ class Reconciler(Rule):
         alerts: list[Alert] = []
 
         # 1. Position drift detection
+        # Read the broker first (slow REST/await), then read local last so the
+        # local snapshot reflects any fill that the fill-drain task persisted
+        # while we were waiting on the broker. Reading local first and broker
+        # second produces a read-skew: a fill landing during the broker fetch
+        # updates local, but the alert compares a stale local read against the
+        # fresh broker read, yielding a false 100% drift that self-heals noisily.
         try:
-            local_positions = self._store.get_positions()
             broker_positions = await self._broker.get_positions()
+            local_positions = self._store.get_positions()
         except Exception as e:
             logger.error("Reconciler failed to fetch positions: %s", e)
             return alerts

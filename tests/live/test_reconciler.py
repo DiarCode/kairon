@@ -190,6 +190,55 @@ class TestReconcilerAsync:
             store.close()
 
     @pytest.mark.asyncio
+    async def test_reconcile_no_false_drift_on_fill_during_broker_fetch(self) -> None:
+        """A fill landing during the (slow) broker fetch must not produce a
+        false drift alert.
+
+        Simulates the live read-skew: the broker's get_positions takes time
+        (REST latency), and the fill-drain task writes the new position to the
+        store while we are awaiting the broker. Because local is read AFTER
+        the broker, it sees the fill and no 100% drift alert fires. With the
+        old local-first ordering, local would read 0 before the fill and the
+        alert would fire spuriously.
+        """
+        with TemporaryDirectory() as tmpdir:
+            store = LiveStore(Path(tmpdir) / "test.db")
+
+            class _SlowBroker:
+                """Broker that writes a position to the store mid-fetch."""
+
+                async def get_positions(self, symbol: str | None = None) -> list[Position]:
+                    # Simulate REST latency; the fill-drain task writes during this.
+                    import asyncio
+                    await asyncio.sleep(0.05)
+                    # The fill has now been persisted by the time we return.
+                    return [_pos(qty=0.011)]
+
+            async def _write_fill_during_fetch() -> None:
+                import asyncio
+                await asyncio.sleep(0.02)  # let the broker fetch start
+                store.write_position(_pos(qty=0.011))
+
+            broker = _SlowBroker()
+            reconciler = Reconciler(
+                drift_tolerance_pct=0.05,
+                grace_seconds=0,
+                reconcile_interval_seconds=0,
+                store=store,
+                broker=broker,
+            )
+            # Race the fill write against the reconcile call.
+            import asyncio
+            _, alerts = await asyncio.gather(
+                _write_fill_during_fetch(), reconciler.reconcile()
+            )
+            critical = [a for a in alerts if a.severity == Severity.CRITICAL]
+            assert len(critical) == 0, (
+                f"expected no false drift alert, got {[a.source for a in critical]}"
+            )
+            store.close()
+
+    @pytest.mark.asyncio
     async def test_reconcile_removes_closed_position(self) -> None:
         """When broker has no position but local does, local entry is deleted."""
         with TemporaryDirectory() as tmpdir:
