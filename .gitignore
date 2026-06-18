@@ -32,6 +32,8 @@ htmlcov/
 
 # Environments
 .env
+.env.*
+!.env.example
 .venv
 env/
 venv/
@@ -47,6 +49,11 @@ ENV/
 # Project-specific
 data/raw/
 data/processed/
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+logs/
+runs/
 models/*/version_*/
 !models/*/latest.json
 reports/*.html

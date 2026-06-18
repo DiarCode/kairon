@@ -247,11 +247,12 @@ class CCXTAdapter:
         timeframe: str,
         callback: OhlcvCallback,
     ) -> None:
-        """Stream OHLCV candles via the ccxt public WebSocket.
+        """Stream OHLCV candles via the ccxt public WebSocket, with REST polling fallback.
 
-        Wraps the underlying async client's ``watch_ohlcv`` (Binance and
-        Bybit both support it in the public ``ccxt.async_support``
-        package). For each emitted candle we convert the ccxt row to a
+        First tries ``watch_ohlcv`` (e.g. Binance). If the venue does not
+        support public WebSocket candles in the free ``ccxt.async_support``
+        build (Bybit), falls back to polling ``fetch_ohlcv`` at the candle
+        cadence. For each emitted candle we convert the ccxt row to a
         one-row :data:`OHLCV_SCHEMA` table and pass it to ``callback``.
 
         Parameters
@@ -280,15 +281,85 @@ class CCXTAdapter:
             raise AdapterError(f"unsupported timeframe {timeframe!r}")
         client = self._get_client()
         market = self._ccxt_market_id(symbol)
-        # ``watch_ohlcv`` returns a list of candles (each is a row) and
-        # blocks until the next update arrives. We iterate forever; the
-        # caller is responsible for cancellation via :meth:`aclose`.
-        while True:
+
+        # Attempt WebSocket streaming first.
+        try:
             candles: list[list[Any]] = await client.watch_ohlcv(
                 market, timeframe=CCXT_TIMEFRAMES[timeframe]
             )
             for row in candles:
                 callback(self._candle_row_to_table(row))
+        except Exception as exc:  # noqa: BLE001
+            if "not supported" not in str(exc).lower():
+                raise
+            logger.warning(
+                f"ccxt watch_ohlcv not supported for {market} on {self.venue.value}; "
+                "falling back to REST polling"
+            )
+            await self._poll_ohlcv(symbol, timeframe, market, client, callback)
+            return
+
+        # ``watch_ohlcv`` returns a list of candles (each is a row) and
+        # blocks until the next update arrives. We iterate forever; the
+        # caller is responsible for cancellation via :meth:`aclose`.
+        while True:
+            candles = await client.watch_ohlcv(
+                market, timeframe=CCXT_TIMEFRAMES[timeframe]
+            )
+            for row in candles:
+                callback(self._candle_row_to_table(row))
+
+    async def _poll_ohlcv(
+        self,
+        symbol: Symbol,
+        timeframe: str,
+        market: str,
+        client: Any,
+        callback: OhlcvCallback,
+    ) -> None:
+        """REST polling fallback for venues without free WebSocket OHLCV."""
+        poll_seconds = _ccxt_timeframe_to_seconds(timeframe)
+        last_ts_ms: int | None = None
+        while True:
+            try:
+                rows: list[list[Any]] = await client.fetch_ohlcv(
+                    market,
+                    timeframe=CCXT_TIMEFRAMES[timeframe],
+                    limit=2,
+                )
+                for row in rows:
+                    ts_ms = int(row[0])
+                    if last_ts_ms is None or ts_ms > last_ts_ms:
+                        callback(self._candle_row_to_table(row))
+                        last_ts_ms = ts_ms
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("ccxt poll_ohlcv failed for %s: %s", market, exc)
+            await asyncio.sleep(poll_seconds)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+def _ccxt_timeframe_to_seconds(timeframe: str) -> int:
+    """Parse a ccxt timeframe string like ``"1m"`` or ``"4h"`` to seconds."""
+    if not timeframe:
+        raise AdapterError("timeframe must be non-empty")
+    unit = timeframe[-1]
+    try:
+        n = int(timeframe[:-1])
+    except ValueError as exc:
+        raise AdapterError(f"invalid timeframe {timeframe!r}") from exc
+    if n <= 0:
+        raise AdapterError(f"invalid timeframe {timeframe!r}")
+    if unit == "m":
+        return n * 60
+    if unit == "h":
+        return n * 60 * 60
+    if unit == "d":
+        return n * 24 * 60 * 60
+    if unit == "w":
+        return n * 7 * 24 * 60 * 60
+    raise AdapterError(f"unsupported timeframe unit {unit!r}")
 
 
 # ---------------------------------------------------------------------------

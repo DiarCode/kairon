@@ -69,14 +69,15 @@ def size_position_vol_aware(
     realized_vol_target: float,
     kelly_cap: float = DEFAULT_KELLY_CAP,
     max_position_equity_fraction: float = DEFAULT_MAX_POSITION_EQUITY_FRACTION,
+    direction: float | None = None,
 ) -> float:
-    """Vol-aware position sizing with a Kelly cap.
+    """Vol-aware position sizing with a Kelly cap and optional direction.
 
     Computes
 
         fraction = predicted_magnitude / realized_vol_target
         fraction = clip(fraction, 0, min(kelly_cap, max_position_equity_fraction))
-        size     = fraction * equity / price
+        size     = sign(direction) * fraction * equity / price
 
     The two caps are independent guards:
 
@@ -90,9 +91,12 @@ def size_position_vol_aware(
     The effective cap is ``min(kelly_cap,
     max_position_equity_fraction)``; the sizer clips the
     fraction-of-equity to that bound. A negative
-    ``predicted_magnitude`` is clipped to zero (no short-side
-    sizing in the long-only v1 path; a future story can extend
-    the contract).
+    ``predicted_magnitude`` is clipped to zero (the magnitude is
+    always interpreted as an unsigned edge). When ``direction`` is
+    supplied, the returned size is signed: negative for short
+    signals (``direction < 0``). When ``direction`` is ``None``,
+    the legacy long-only behavior is preserved (size is always
+    non-negative).
 
     Parameters
     ----------
@@ -103,9 +107,8 @@ def size_position_vol_aware(
         The asset's current price. Must be > 0.
     predicted_magnitude
         The model's predicted return magnitude (e.g. the W6.4
-        magnitude head's output, in return units). Can be any
-        finite real; negative values are clipped to 0 (long-only
-        semantics).
+        magnitude head's output, in return units). Must be
+        finite; negative values are clipped to 0.
     realized_vol_target
         The realised vol target for the position-sizing rule
         (e.g. a 1h realised vol for a 1h horizon). Must be > 0.
@@ -116,13 +119,18 @@ def size_position_vol_aware(
         The operational cap on the position's fraction of
         equity, in fraction-of-equity units. Default
         ``0.20`` (the Kairon settings default).
+    direction
+        Optional signed signal direction. If ``direction < 0`` the
+        returned size is negative (short). If ``None`` or
+        ``direction >= 0`` the returned size is non-negative.
 
     Returns
     -------
     float
         The position size in *units of the asset* (notional /
-        price). Always non-negative. Always finite. Equals
-        ``fraction * equity / price`` where
+        price). Signed when ``direction`` is supplied: negative
+        for short signals. Always finite. Equals
+        ``sign(direction) * fraction * equity / price`` where
         ``fraction = min(max(predicted_magnitude /
         realized_vol_target, 0), min(kelly_cap,
         max_position_equity_fraction))``.
@@ -170,14 +178,17 @@ def size_position_vol_aware(
     effective_cap: float = min(kelly_cap, max_position_equity_fraction)
 
     # Raw fraction: predicted_magnitude / realized_vol_target.
-    # Negative predicted_magnitude -> 0 (long-only v1 path;
-    # a short-side sizer is a future story).
+    # Magnitude is unsigned; direction determines the sign of the output.
     raw_fraction: float = max(0.0, predicted_magnitude / realized_vol_target)
 
     # Clip the fraction to the effective cap.
     fraction: float = min(raw_fraction, effective_cap)
 
-    return float(fraction * equity / price)
+    size: float = fraction * equity / price
+    if direction is not None and direction < 0:
+        size = -size
+
+    return float(size)
 
 
 __all__ = [

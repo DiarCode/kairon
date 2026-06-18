@@ -69,6 +69,8 @@ class KaironSettings(BaseSettings):
     bybit_api_key: str = Field(default="")
     bybit_api_secret: str = Field(default="")
     bybit_testnet: bool = Field(default=True)
+    bybit_tld: str = Field(default="com", pattern=r"^(com|kz|hk|eu|nl)$")
+    bybit_broker: str = Field(default="pybit", pattern=r"^(pybit|raw)$")
 
     # Live trading mode and risk
     live_dry_run: bool = Field(default=True)

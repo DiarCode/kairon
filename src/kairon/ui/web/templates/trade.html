@@ -1,0 +1,352 @@
+{% extends "layout.html" %}
+{% block body %}
+<section class="kairon-glass-card kairon-screen">
+    <h1 class="kairon-screen-title">Live Trading</h1>
+
+    <!-- Status Panel -->
+    <div id="status-panel" class="kairon-trade-status">
+        <div class="kairon-status-grid">
+            <div class="kairon-status-tile">
+                <span class="kairon-status-label">Mode</span>
+                <span id="status-mode" class="kairon-status-value">—</span>
+            </div>
+            <div class="kairon-status-tile">
+                <span class="kairon-status-label">Equity</span>
+                <span id="status-equity" class="kairon-status-value">—</span>
+            </div>
+            <div class="kairon-status-tile">
+                <span class="kairon-status-label">Positions</span>
+                <span id="status-positions" class="kairon-status-value">—</span>
+            </div>
+            <div class="kairon-status-tile">
+                <span class="kairon-status-label">Status</span>
+                <span id="status-state" class="kairon-status-value">—</span>
+            </div>
+        </div>
+        <div class="kairon-controls">
+            <button id="btn-halt" type="button" class="kairon-btn kairon-btn-danger" onclick="haltTrading()">
+                ⬛ Halt Trading
+            </button>
+            <button id="btn-unhalt" type="button" class="kairon-btn kairon-btn-success" onclick="unhaltTrading()" disabled>
+                ▶ Resume Trading
+            </button>
+        </div>
+    </div>
+
+    <!-- Open Positions -->
+    <div class="kairon-trade-section">
+        <h2 class="kairon-section-title">Open Positions</h2>
+        <div class="kairon-table-wrap">
+            <table id="positions-table" class="kairon-table">
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Side</th>
+                        <th>Qty</th>
+                        <th>Avg Entry</th>
+                        <th>Unrealized PnL</th>
+                        <th>Updated</th>
+                    </tr>
+                </thead>
+                <tbody id="positions-body">
+                    <tr><td colspan="6" class="kairon-table-empty">No open positions</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Recent Orders -->
+    <div class="kairon-trade-section">
+        <h2 class="kairon-section-title">Recent Orders</h2>
+        <div class="kairon-table-wrap">
+            <table id="orders-table" class="kairon-table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Symbol</th>
+                        <th>Side</th>
+                        <th>Qty</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="orders-body">
+                    <tr><td colspan="6" class="kairon-table-empty">No recent orders</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Audit Events -->
+    <div class="kairon-trade-section">
+        <h2 class="kairon-section-title">Events</h2>
+        <div class="kairon-table-wrap">
+            <table id="events-table" class="kairon-table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Kind</th>
+                        <th>Severity</th>
+                        <th>Detail</th>
+                    </tr>
+                </thead>
+                <tbody id="events-body">
+                    <tr><td colspan="4" class="kairon-table-empty">No events</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<style>
+    .kairon-trade-status { margin-bottom: 24px; }
+    .kairon-status-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+    .kairon-status-tile {
+        background: var(--kairon-bg-elevated, rgba(255,255,255,0.03));
+        border: 1px solid var(--kairon-border-subtle, rgba(255,255,255,0.08));
+        padding: 12px 16px;
+        border-radius: 2px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .kairon-status-label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--kairon-text-muted, #888);
+    }
+    .kairon-status-value {
+        font-size: 20px;
+        font-family: var(--kairon-font-mono, 'JetBrains Mono', 'Fira Code', monospace);
+        color: var(--kairon-text-primary, #e0e0e0);
+    }
+    .kairon-controls {
+        display: flex;
+        gap: 12px;
+    }
+    .kairon-btn {
+        padding: 8px 20px;
+        font-size: 13px;
+        font-family: var(--kairon-font-mono, 'JetBrains Mono', monospace);
+        border: 1px solid var(--kairon-border-subtle, rgba(255,255,255,0.08));
+        border-radius: 2px;
+        cursor: pointer;
+        transition: background 0.15s, opacity 0.15s;
+        background: transparent;
+        color: var(--kairon-text-primary, #e0e0e0);
+    }
+    .kairon-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+    .kairon-btn-danger {
+        border-color: #ef4444;
+        color: #ef4444;
+    }
+    .kairon-btn-danger:hover:not(:disabled) {
+        background: rgba(239,68,68,0.15);
+    }
+    .kairon-btn-success {
+        border-color: #22c55e;
+        color: #22c55e;
+    }
+    .kairon-btn-success:hover:not(:disabled) {
+        background: rgba(34,197,94,0.15);
+    }
+    .kairon-trade-section {
+        margin-bottom: 24px;
+    }
+    .kairon-section-title {
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--kairon-text-muted, #888);
+        margin-bottom: 8px;
+    }
+    .kairon-table-wrap {
+        overflow-x: auto;
+    }
+    .kairon-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        font-family: var(--kairon-font-mono, 'JetBrains Mono', monospace);
+    }
+    .kairon-table th {
+        text-align: left;
+        padding: 6px 10px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--kairon-text-muted, #888);
+        border-bottom: 1px solid var(--kairon-border-subtle, rgba(255,255,255,0.08));
+    }
+    .kairon-table td {
+        padding: 6px 10px;
+        border-bottom: 1px solid var(--kairon-border-subtle, rgba(255,255,255,0.04));
+        color: var(--kairon-text-primary, #e0e0e0);
+    }
+    .kairon-table-empty {
+        text-align: center;
+        color: var(--kairon-text-muted, #666);
+        padding: 20px;
+    }
+    .kairon-side-buy { color: #22c55e; }
+    .kairon-side-sell { color: #ef4444; }
+    .kairon-severity-critical { color: #ef4444; }
+    .kairon-severity-warning { color: #f59e0b; }
+    .kairon-severity-info { color: #3b82f6; }
+
+    @media (max-width: 600px) {
+        .kairon-status-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+</style>
+
+<script>
+    const POLL_INTERVAL = 3000;  // 3 seconds
+
+    function fmt(value, decimals = 2) {
+        if (value === null || value === undefined) return '—';
+        return Number(value).toLocaleString(undefined, {
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals
+        });
+    }
+
+    function fmtSide(side) {
+        const cls = side === 'Buy' ? 'kairon-side-buy' : 'kairon-side-sell';
+        return `<span class="${cls}">${side}</span>`;
+    }
+
+    function fmtSeverity(severity) {
+        const cls = `kairon-severity-${severity}`;
+        return `<span class="${cls}">${severity}</span>`;
+    }
+
+    async function fetchJSON(url) {
+        try {
+            const res = await fetch(url);
+            if (!res.ok) return null;
+            return await res.json();
+        } catch {
+            return null;
+        }
+    }
+
+    async function refreshStatus() {
+        const data = await fetchJSON('/api/trade/status');
+        if (!data) return;
+
+        document.getElementById('status-mode').textContent = data.mode || '—';
+        document.getElementById('status-equity').textContent = '$' + fmt(data.equity);
+        document.getElementById('status-positions').textContent = String(data.n_positions ?? 0);
+        document.getElementById('status-state').textContent = data.halted ? '⛔ HALTED' : '● Running';
+
+        const btnHalt = document.getElementById('btn-halt');
+        const btnUnhalt = document.getElementById('btn-unhalt');
+        btnHalt.disabled = data.halted;
+        btnUnhalt.disabled = !data.halted;
+
+        if (data.halted) {
+            document.getElementById('status-state').style.color = '#ef4444';
+        } else {
+            document.getElementById('status-state').style.color = '#22c55e';
+        }
+    }
+
+    async function refreshPositions() {
+        const data = await fetchJSON('/api/trade/positions');
+        if (!data) return;
+
+        const tbody = document.getElementById('positions-body');
+        if (!data.positions || data.positions.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="kairon-table-empty">No open positions</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.positions.map(p => `
+            <tr>
+                <td>${p.symbol}</td>
+                <td>${fmtSide(p.side)}</td>
+                <td>${fmt(p.qty, 6)}</td>
+                <td>${fmt(p.avg_entry)}</td>
+                <td style="color: ${p.unrealized_pnl >= 0 ? '#22c55e' : '#ef4444'}">${fmt(p.unrealized_pnl)}</td>
+                <td>${p.ts ? new Date(p.ts).toLocaleTimeString() : '—'}</td>
+            </tr>
+        `).join('');
+    }
+
+    async function refreshOrders() {
+        const data = await fetchJSON('/api/trade/orders');
+        if (!data) return;
+
+        const tbody = document.getElementById('orders-body');
+        if (!data.orders || data.orders.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="kairon-table-empty">No recent orders</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.orders.map(o => `
+            <tr>
+                <td>${o.ts ? new Date(o.ts).toLocaleTimeString() : '—'}</td>
+                <td>${o.symbol}</td>
+                <td>${fmtSide(o.side)}</td>
+                <td>${fmt(o.qty, 6)}</td>
+                <td>${o.order_type}</td>
+                <td>${o.status}</td>
+            </tr>
+        `).join('');
+    }
+
+    async function refreshEvents() {
+        const data = await fetchJSON('/api/trade/events');
+        if (!data) return;
+
+        const tbody = document.getElementById('events-body');
+        if (!data.events || data.events.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="kairon-table-empty">No events</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.events.map(e => `
+            <tr>
+                <td>${e.ts ? new Date(e.ts).toLocaleTimeString() : '—'}</td>
+                <td>${e.kind}</td>
+                <td>${fmtSeverity(e.severity)}</td>
+                <td>${e.payload ? JSON.stringify(e.payload).slice(0, 80) : '—'}</td>
+            </tr>
+        `).join('');
+    }
+
+    async function haltTrading() {
+        const res = await fetch('/api/trade/halt', { method: 'POST' });
+        const data = await res.json();
+        refreshStatus();
+    }
+
+    async function unhaltTrading() {
+        const res = await fetch('/api/trade/unhalt', { method: 'POST' });
+        const data = await res.json();
+        refreshStatus();
+    }
+
+    async function refreshAll() {
+        await Promise.all([
+            refreshStatus(),
+            refreshPositions(),
+            refreshOrders(),
+            refreshEvents(),
+        ]);
+    }
+
+    // Initial load
+    refreshAll();
+    // Poll every 3 seconds
+    setInterval(refreshAll, POLL_INTERVAL);
+</script>
+{% endblock %}
