@@ -88,10 +88,27 @@ def create_app() -> Any:
     app.state.run_store = RunStore(Path("data/runs.db"))
     app.state.charts_dir = get_charts_dir()
 
+    # Live trading host + shared store (also fixes the /trade 503s).
+    from kairon.live.host import SessionHost
+    from kairon.live.store import LiveStore
+
+    app.state.live_store = LiveStore(Path("data/runs.db"))
+    app.state.session_host = SessionHost(data_dir=Path("data"))
+
     # Register the 6 web screens + their API endpoints
+    # Root redirect → the entry screen of the analysis flow.
+    from starlette.responses import RedirectResponse
+
     from kairon.ui.web.screens import (
         analyze_screen,
         configure_screen,
+        live_halt,
+        live_screen,
+        live_start,
+        live_status,
+        live_stop,
+        live_stream,
+        live_unhalt,
         result_screen,
         run_status,
         save_run,
@@ -108,9 +125,6 @@ def create_app() -> Any:
         upload_screen,
     )
 
-    # Root redirect → the entry screen of the analysis flow.
-    from starlette.responses import RedirectResponse
-
     async def _root_redirect() -> Any:
         return RedirectResponse(url="/upload")
 
@@ -121,6 +135,7 @@ def create_app() -> Any:
     app.add_api_route("/result/{run_id}", result_screen, methods=["GET"], tags=["web"])
     app.add_api_route("/track", track_screen, methods=["GET"], tags=["web"])
     app.add_api_route("/trade", trade_screen, methods=["GET"], tags=["web"])
+    app.add_api_route("/live", live_screen, methods=["GET"], tags=["web"])
     app.add_api_route("/api/uploads", upload_csv, methods=["POST"], tags=["web"])
     app.add_api_route("/api/runs", start_run, methods=["POST"], tags=["web"])
     app.add_api_route("/api/runs/{run_id}", run_status, methods=["GET"], tags=["web"])
@@ -132,6 +147,13 @@ def create_app() -> Any:
     app.add_api_route("/api/trade/events", trade_events, methods=["GET"], tags=["trade"])
     app.add_api_route("/api/trade/halt", trade_halt, methods=["POST"], tags=["trade"])
     app.add_api_route("/api/trade/unhalt", trade_unhalt, methods=["POST"], tags=["trade"])
+    # Live dashboard API (in-process session host + SSE stream)
+    app.add_api_route("/api/live/stream", live_stream, methods=["GET"], tags=["live"])
+    app.add_api_route("/api/live/start", live_start, methods=["POST"], tags=["live"])
+    app.add_api_route("/api/live/stop", live_stop, methods=["POST"], tags=["live"])
+    app.add_api_route("/api/live/halt", live_halt, methods=["POST"], tags=["live"])
+    app.add_api_route("/api/live/unhalt", live_unhalt, methods=["POST"], tags=["live"])
+    app.add_api_route("/api/live/status", live_status, methods=["GET"], tags=["live"])
 
     # Lifespan: start the verifier thread on startup, stop it on shutdown.
     # The verifier polls the runs table for due rows; the ccxt fetch is
@@ -157,6 +179,11 @@ def create_app() -> Any:
             yield None
         finally:
             thread.stop(timeout=2.0)
+            # Tear down any hosted live sessions, then close the shared store.
+            with contextlib.suppress(Exception):
+                await app.state.session_host.shutdown_all()
+            with contextlib.suppress(Exception):
+                app.state.live_store.close()
 
     import typing
     from contextlib import AbstractAsyncContextManager

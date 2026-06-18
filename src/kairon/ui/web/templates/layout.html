@@ -35,9 +35,26 @@
             font-weight: 600;
             color: var(--text);
             text-align: center;
-            margin-bottom: 24px;
+            margin-bottom: 12px;
             letter-spacing: 0.02em;
         }
+        .kairon-nav {
+            display: flex;
+            justify-content: center;
+            gap: 18px;
+            margin-bottom: 24px;
+            font-family: var(--font-ui);
+            font-size: 13px;
+        }
+        .kairon-nav a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 4px 10px;
+            border-radius: var(--radius-pill);
+            transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
+        }
+        .kairon-nav a:hover { color: var(--text); background: var(--glass-bg); }
+        .kairon-nav a.active { color: var(--text); background: var(--accent-soft, rgba(59,130,246,0.18)); }
         .kairon-screen { width: min(900px, 100%); }
         .kairon-screen-title { margin: 0 0 24px 0; font-size: 22px; font-weight: 600; }
         .kairon-drop-zone {
@@ -76,6 +93,11 @@
 <body>
     <main class="kairon-shell">
         <div class="kairon-brand">Kairon</div>
+        <nav class="kairon-nav">
+            <a href="/upload">Upload</a>
+            <a href="/trade">Backtest</a>
+            <a href="/live"{% if stage == "live" %} class="active"{% endif %}>Live</a>
+        </nav>
         {% block body %}{% endblock %}
     </main>
 </body>

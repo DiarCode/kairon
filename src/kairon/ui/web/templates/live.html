@@ -1,0 +1,473 @@
+{% extends "layout.html" %}
+{% block body %}
+<link rel="stylesheet" href="{{ url_for('kairon-web-static', path='/live.css') }}" />
+<style>
+    /* Dashboard is tall + wide — top-align instead of vertically centering. */
+    .kairon-shell { justify-content: flex-start; }
+</style>
+
+<div class="live-shell">
+    <!-- control bar -->
+    <section class="live-card">
+        <div class="live-bar">
+            <div class="status-block">
+                <span id="status-pill" class="status-pill" data-state="stopped">STOPPED</span>
+                <span id="mode-label" class="mode-label">No session</span>
+                <span id="session-id" class="session-id"></span>
+            </div>
+            <form id="config-form" class="config-form" autocomplete="off">
+                <label>Symbols
+                    <input id="cfg-symbols" type="text" value="BTC-USDT-PERP" />
+                </label>
+                <label>Timeframe
+                    <select id="cfg-timeframe">
+                        <option value="1m">1m</option>
+                        <option value="5m">5m</option>
+                        <option value="15m">15m</option>
+                        <option value="1h">1h</option>
+                        <option value="4h">4h</option>
+                    </select>
+                </label>
+                <label>Cadence (s)
+                    <input id="cfg-cadence" type="number" min="10" value="60" />
+                </label>
+                <label>Mode
+                    <select id="cfg-mode">
+                        <option value="paper">Paper</option>
+                        <option value="testnet" selected>Bybit Testnet</option>
+                        <option value="live">Mainnet</option>
+                    </select>
+                </label>
+                <label>Max positions
+                    <input id="cfg-maxpos" type="number" min="1" value="5" />
+                </label>
+                <label>Max daily loss %
+                    <input id="cfg-loss" type="number" min="0.01" max="100" step="0.1" value="3" />
+                </label>
+            </form>
+            <div class="controls">
+                <button id="btn-start" class="live-btn live-btn-primary" type="button">Start</button>
+                <button id="btn-halt" class="live-btn live-btn-warn" type="button" disabled>Halt</button>
+                <button id="btn-stop" class="live-btn live-btn-danger" type="button" disabled>Stop &amp; Flatten</button>
+            </div>
+        </div>
+        <div id="mainnet-banner" class="mainnet-banner">⚠ REAL MONEY — mainnet trading enabled. Orders will execute against your live Bybit account.</div>
+    </section>
+
+    <!-- KPI row -->
+    <section class="kpi-row">
+        <div class="live-card kpi-tile">
+            <div class="kpi-label">Equity</div>
+            <div id="kpi-equity" class="kpi-value">—</div>
+            <div id="kpi-equity-sub" class="kpi-sub"></div>
+        </div>
+        <div class="live-card kpi-tile">
+            <div class="kpi-label">Session PnL</div>
+            <div id="kpi-pnl" class="kpi-value">—</div>
+            <div id="kpi-pnl-sub" class="kpi-sub"></div>
+        </div>
+        <div class="live-card kpi-tile">
+            <div class="kpi-label">Open positions</div>
+            <div id="kpi-positions" class="kpi-value">0</div>
+            <div id="kpi-positions-sub" class="kpi-sub"></div>
+        </div>
+        <div class="live-card kpi-tile">
+            <div class="kpi-label">Win rate</div>
+            <div id="kpi-winrate" class="kpi-value">—</div>
+            <div id="kpi-winrate-sub" class="kpi-sub"></div>
+        </div>
+    </section>
+
+    <!-- equity sparkline -->
+    <section class="live-card spark-card">
+        <h3>Equity curve</h3>
+        <canvas id="equity-canvas"></canvas>
+    </section>
+
+    <!-- main grid -->
+    <section class="live-grid">
+        <!-- AI decisions feed -->
+        <div class="live-card decisions-card">
+            <h3>AI Decisions</h3>
+            <div id="decisions-feed" class="decisions-feed">
+                <div class="muted" style="padding:20px;text-align:center;">Waiting for decisions…</div>
+            </div>
+        </div>
+
+        <!-- open positions -->
+        <div class="live-card">
+            <h3>Open Positions</h3>
+            <table class="data-table">
+                <thead>
+                    <tr><th>Symbol</th><th>Side</th><th>Qty</th><th>Entry</th><th>uPnL</th></tr>
+                </thead>
+                <tbody id="positions-body">
+                    <tr class="empty-row"><td colspan="5">No open positions</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- closed trades -->
+        <div class="live-card">
+            <h3>Closed Trades</h3>
+            <table class="data-table">
+                <thead>
+                    <tr><th>Symbol</th><th>Side</th><th>Entry</th><th>Exit</th><th>Realized</th></tr>
+                </thead>
+                <tbody id="closed-body">
+                    <tr class="empty-row"><td colspan="5">No closed trades yet</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- audit log + orders -->
+    <section class="live-grid">
+        <div class="live-card">
+            <h3>Recent Orders</h3>
+            <table class="data-table">
+                <thead>
+                    <tr><th>Time</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Type</th><th>Status</th></tr>
+                </thead>
+                <tbody id="orders-body">
+                    <tr class="empty-row"><td colspan="6">No orders yet</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="live-card">
+            <h3>Audit Log</h3>
+            <div id="events-log" class="events-log">
+                <div class="muted" style="padding:14px;text-align:center;">No events</div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<script>
+    "use strict";
+    const $ = (id) => document.getElementById(id);
+
+    const pill = $("status-pill");
+    const modeLabel = $("mode-label");
+    const sessionIdEl = $("session-id");
+    const btnStart = $("btn-start");
+    const btnHalt = $("btn-halt");
+    const btnStop = $("btn-stop");
+    const mainnetBanner = $("mainnet-banner");
+    const cfgMode = $("cfg-mode");
+
+    function fmtNum(v, d = 2) {
+        if (v === null || v === undefined || v === "") return "—";
+        const n = Number(v);
+        if (!isFinite(n)) return String(v);
+        return n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+    }
+    function fmtPnl(v) {
+        const n = Number(v || 0);
+        const sign = n > 0 ? "+" : "";
+        return sign + fmtNum(n, 2);
+    }
+    function pnlClass(v) {
+        const n = Number(v || 0);
+        if (n > 0) return "pnl-pos";
+        if (n < 0) return "pnl-neg";
+        return "";
+    }
+    function shortTime(ts) {
+        if (!ts) return "";
+        const s = String(ts);
+        // Keep the time portion of an ISO timestamp.
+        return s.length > 19 ? s.slice(11, 19) : s;
+    }
+    // Normalize a direction value (int 1/-1/0 or string) to {label, cls, arrow}.
+    function dirInfo(d) {
+        const s = String(d ?? "").toLowerCase();
+        if (d === 1 || s === "long" || s === "buy") return { label: "LONG", cls: "long", arrow: "▲" };
+        if (d === -1 || s === "short" || s === "sell") return { label: "SHORT", cls: "short", arrow: "▼" };
+        return { label: "FLAT", cls: "flat", arrow: "■" };
+    }
+    function sideInfo(side) {
+        const s = String(side ?? "").toLowerCase();
+        if (s.includes("long") || s.includes("buy")) return { label: "LONG", cls: "long" };
+        if (s.includes("short") || s.includes("sell")) return { label: "SHORT", cls: "short" };
+        return { label: String(side ?? "—"), cls: "" };
+    }
+
+    function drawSpark(series) {
+        const canvas = $("equity-canvas");
+        const ctx = canvas.getContext("2d");
+        const w = canvas.clientWidth, h = canvas.clientHeight;
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = w * dpr; canvas.height = h * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+        if (!series || series.length < 2) {
+            ctx.fillStyle = "rgba(244,244,245,0.4)";
+            ctx.font = "11px 'JetBrains Mono', monospace";
+            ctx.fillText("No equity history yet", 10, h / 2);
+            return;
+        }
+        const eqs = series.map((p) => Number(p.equity)).filter((n) => isFinite(n));
+        if (eqs.length < 2) return;
+        const min = Math.min(...eqs), max = Math.max(...eqs);
+        const span = max - min || 1;
+        const pad = 6;
+        const xAt = (i) => pad + (i / (series.length - 1)) * (w - 2 * pad);
+        const yAt = (v) => pad + (1 - (v - min) / span) * (h - 2 * pad);
+        const slopeUp = eqs[eqs.length - 1] >= eqs[0];
+        const color = slopeUp ? getCss("--positive") : getCss("--negative");
+        // area fill
+        ctx.beginPath();
+        ctx.moveTo(xAt(0), yAt(eqs[0]));
+        eqs.forEach((v, i) => ctx.lineTo(xAt(i), yAt(v)));
+        ctx.lineTo(xAt(eqs.length - 1), h - pad);
+        ctx.lineTo(xAt(0), h - pad);
+        ctx.closePath();
+        const grad = ctx.createLinearGradient(0, 0, 0, h);
+        grad.addColorStop(0, color + "44");
+        grad.addColorStop(1, color + "00");
+        ctx.fillStyle = grad;
+        ctx.fill();
+        // line
+        ctx.beginPath();
+        ctx.moveTo(xAt(0), yAt(eqs[0]));
+        eqs.forEach((v, i) => ctx.lineTo(xAt(i), yAt(v)));
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+    }
+    function getCss(name) {
+        return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#3B82F6";
+    }
+
+    function renderSnapshot(s) {
+        // status pill
+        const running = !!s.is_running;
+        const state = s.halted ? "halted" : (running ? "running" : "stopped");
+        pill.dataset.state = state;
+        pill.textContent = state.toUpperCase();
+        // mode + session id
+        if (s.mode) {
+            modeLabel.textContent = s.mode;
+            modeLabel.classList.toggle("mainnet", s.mode === "MAINNET");
+        } else {
+            modeLabel.textContent = "No session";
+            modeLabel.classList.remove("mainnet");
+        }
+        sessionIdEl.textContent = s.session_id ? "sess " + s.session_id : "";
+
+        // buttons
+        btnStart.disabled = running;
+        btnHalt.disabled = !running || s.halted;
+        btnStop.disabled = !running;
+
+        // KPIs
+        $("kpi-equity").textContent = fmtNum(s.equity, 2);
+        $("kpi-equity-sub").textContent = s.initial_equity ? "start " + fmtNum(s.initial_equity, 2) : "";
+        const pnl = Number(s.session_pnl || 0);
+        const pnlEl = $("kpi-pnl");
+        pnlEl.textContent = fmtPnl(pnl);
+        pnlEl.className = "kpi-value " + pnlClass(pnl);
+        $("kpi-pnl-sub").textContent =
+            "real " + fmtPnl(s.realized_pnl) + " · unreal " + fmtPnl(s.unrealized_pnl);
+        $("kpi-positions").textContent = String(s.n_positions || 0);
+        $("kpi-positions-sub").textContent = (s.symbols || []).join(", ");
+        const wr = Number(s.win_rate || 0);
+        $("kpi-winrate").textContent = fmtNum(wr * 100, 1) + "%";
+        const closed = (s.closed_trades || []).length;
+        $("kpi-winrate-sub").textContent = closed + " closed";
+
+        // positions
+        const pb = $("positions-body");
+        const positions = s.positions || [];
+        if (positions.length === 0) {
+            pb.innerHTML = '<tr class="empty-row"><td colspan="5">No open positions</td></tr>';
+        } else {
+            pb.innerHTML = positions.map((p) => {
+                const si = sideInfo(p.side);
+                const u = Number(p.unrealized_pnl || 0);
+                return `<tr>
+                    <td>${p.symbol}</td>
+                    <td><span class="side-badge ${si.cls}">${si.label}</span></td>
+                    <td>${fmtNum(p.qty, 4)}</td>
+                    <td>${fmtNum(p.avg_entry, 2)}</td>
+                    <td class="${pnlClass(u)}">${fmtPnl(u)}</td>
+                </tr>`;
+            }).join("");
+        }
+
+        // closed trades (newest first)
+        const cb = $("closed-body");
+        const closedTrades = (s.closed_trades || []).slice().reverse();
+        if (closedTrades.length === 0) {
+            cb.innerHTML = '<tr class="empty-row"><td colspan="5">No closed trades yet</td></tr>';
+        } else {
+            cb.innerHTML = closedTrades.map((c) => {
+                const r = Number(c.realized_pnl || 0);
+                const si = sideInfo(c.side);
+                return `<tr>
+                    <td>${c.symbol || "—"}</td>
+                    <td><span class="side-badge ${si.cls}">${si.label}</span></td>
+                    <td>${fmtNum(c.entry_price, 2)}</td>
+                    <td>${fmtNum(c.exit_price, 2)}</td>
+                    <td class="${pnlClass(r)}">${fmtPnl(r)}</td>
+                </tr>`;
+            }).join("");
+        }
+
+        // orders
+        const ob = $("orders-body");
+        const orders = s.orders || [];
+        if (orders.length === 0) {
+            ob.innerHTML = '<tr class="empty-row"><td colspan="6">No orders yet</td></tr>';
+        } else {
+            ob.innerHTML = orders.map((o) => {
+                const si = sideInfo(o.side);
+                return `<tr>
+                    <td class="muted">${shortTime(o.ts)}</td>
+                    <td>${o.symbol || "—"}</td>
+                    <td><span class="side-badge ${si.cls}">${si.label}</span></td>
+                    <td>${fmtNum(o.qty, 4)}</td>
+                    <td class="muted">${o.order_type || "—"}</td>
+                    <td class="muted">${o.status || "—"}</td>
+                </tr>`;
+            }).join("");
+        }
+
+        // decisions feed
+        const df = $("decisions-feed");
+        const decisions = s.decisions || [];
+        if (decisions.length === 0) {
+            df.innerHTML = '<div class="muted" style="padding:20px;text-align:center;">Waiting for decisions…</div>';
+        } else {
+            df.innerHTML = decisions.map((d) => {
+                const di = dirInfo(d.direction);
+                const conf = Math.max(0, Math.min(1, Number(d.confidence || 0)));
+                const scores = [
+                    { k: "trend", v: d.trend_score },
+                    { k: "moment", v: d.momentum_score },
+                    { k: "struct", v: d.structure_score },
+                    { k: "volume", v: d.volume_score },
+                ];
+                const miniBars = scores.map((sc) => {
+                    const v = Math.max(0, Math.min(1, Number(sc.v || 0)));
+                    return `<div class="conf-mini">
+                        <div class="conf-mini-label">${sc.k}</div>
+                        <div class="conf-mini-bar"><div class="conf-mini-fill" style="width:${(v * 100).toFixed(0)}%;background:${v >= 0.5 ? "var(--positive)" : "var(--text-secondary)"};"></div></div>
+                    </div>`;
+                }).join("");
+                const just = (d.justifications || []).slice(0, 4)
+                    .map((j) => `<li>${escapeHtml(String(j))}</li>`).join("");
+                let outcome = "";
+                if (d.outcome) {
+                    const cls = d.outcome;
+                    const pnlTxt = d.outcome_pnl != null ? " · " + fmtPnl(d.outcome_pnl) : "";
+                    outcome = `<span class="outcome-tag ${cls}">${d.outcome}${pnlTxt}</span>`;
+                }
+                return `<div class="decision-card">
+                    <div class="decision-head">
+                        <span class="dir-badge ${di.cls}">${di.arrow} ${di.label}</span>
+                        <span class="decision-sym">${d.symbol || "—"}</span>
+                        <span class="decision-ts">${shortTime(d.timestamp)}</span>
+                    </div>
+                    <div class="conf-row">
+                        <span class="conf-label">Confidence</span>
+                        <div class="conf-bar"><div class="conf-fill" style="width:${(conf * 100).toFixed(0)}%;"></div></div>
+                        <span class="conf-val">${(conf * 100).toFixed(0)}%</span>
+                    </div>
+                    <div class="confluence-grid">${miniBars}</div>
+                    ${just ? `<ul class="justifications">${just}</ul>` : ""}
+                    ${outcome}
+                </div>`;
+            }).join("");
+        }
+
+        // events
+        const el = $("events-log");
+        const events = s.events || [];
+        if (events.length === 0) {
+            el.innerHTML = '<div class="muted" style="padding:14px;text-align:center;">No events</div>';
+        } else {
+            el.innerHTML = events.map((e) => {
+                const sev = (e.severity || "info").toLowerCase();
+                const payload = typeof e.payload === "string" ? e.payload : JSON.stringify(e.payload || {});
+                return `<div class="event-row">
+                    <span class="event-ts">${shortTime(e.ts)}</span>
+                    <span class="event-kind ${sev}">${e.kind || "event"}</span>
+                    <span class="event-payload">${escapeHtml(payload)}</span>
+                </div>`;
+            }).join("");
+        }
+
+        // sparkline
+        drawSpark(s.equity_series || []);
+    }
+
+    function escapeHtml(s) {
+        return s.replace(/[&<>"']/g, (c) => (
+            { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+        ));
+    }
+
+    function buildRequest() {
+        const symbols = $("cfg-symbols").value
+            .split(",").map((s) => s.trim()).filter(Boolean);
+        return {
+            symbols: symbols.length ? symbols : ["BTC-USDT-PERP"],
+            timeframe: $("cfg-timeframe").value,
+            cadence_seconds: Number($("cfg-cadence").value) || 60,
+            mode: cfgMode.value,
+            max_open_positions: Number($("cfg-maxpos").value) || 5,
+            max_daily_loss_pct: (Number($("cfg-loss").value) || 3) / 100,
+            confirm_live: cfgMode.value === "live",
+        };
+    }
+
+    async function postJSON(url, body) {
+        const r = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        });
+        let data = {};
+        try { data = await r.json(); } catch (e) { /* ignore */ }
+        if (!r.ok) {
+            alert("Error: " + (data.message || data.error || r.status));
+        }
+        return data;
+    }
+
+    btnStart.addEventListener("click", async () => {
+        const req = buildRequest();
+        if (req.mode === "live") {
+            const ok = confirm("REAL MONEY: This will place orders on the Bybit MAINNET with your live keys.\n\nAre you sure?");
+            if (!ok) return;
+        }
+        await postJSON("/api/live/start", req);
+    });
+
+    btnHalt.addEventListener("click", async () => {
+        await postJSON("/api/live/halt", {});
+    });
+
+    btnStop.addEventListener("click", async () => {
+        const ok = confirm("Stop & Flatten will close ALL open positions and shut the session down.\n\nContinue?");
+        if (!ok) return;
+        await postJSON("/api/live/stop", {});
+    });
+
+    cfgMode.addEventListener("change", () => {
+        mainnetBanner.classList.toggle("show", cfgMode.value === "live");
+    });
+
+    // SSE stream — browser auto-reconnects on drop.
+    function connect() {
+        const es = new EventSource("/api/live/stream");
+        es.onmessage = (ev) => {
+            try { renderSnapshot(JSON.parse(ev.data)); } catch (e) { /* skip bad frame */ }
+        };
+        es.onerror = () => { pill.dataset.state = "reconnecting"; pill.textContent = "RECONNECTING"; };
+    }
+    connect();
+</script>
+{% endblock %}

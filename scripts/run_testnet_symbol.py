@@ -19,18 +19,16 @@ import sys
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
 
 from kairon.config import KaironSettings
 from kairon.data.adapters.ccxt_adapter import CCXTAdapter
 from kairon.data.symbols import CryptoVenue, Symbol, crypto_perp
 from kairon.live.analytics import compute_session_report, format_report
-from kairon.live.broker.base import Order, OrderStatus
+from kairon.live.broker.base import OrderStatus
 from kairon.live.broker.bybit import BybitBroker
 from kairon.live.config import LiveConfig
+from kairon.live.cooldown import CooldownBrokerWrapper, CooledTradingLoop
 from kairon.live.guardian import Guardian
-from kairon.live.orchestrator import TradingLoop
-from kairon.live.predictor import LivePrediction
 from kairon.live.reconciler import Reconciler
 from kairon.live.store import LiveStore
 from kairon.live.strategy import ComprehensiveStrategy
@@ -38,55 +36,6 @@ from kairon.live.strategy import ComprehensiveStrategy
 DEFAULT_DURATION_SECONDS = 20 * 60
 DEFAULT_HISTORY_MINUTES = 60
 DEFAULT_POLL_INTERVAL_SECONDS = 60.0
-DEFAULT_COOLDOWN_SECONDS = 5 * 60  # one trade every 5 minutes per symbol
-
-
-class CooldownBrokerWrapper:
-    """Wrap a Broker and record the last accepted order timestamp per symbol.
-
-    Used by CooledTradingLoop to suppress rapid rebalancing during short
-    testnet sessions.
-    """
-
-    def __init__(
-        self,
-        inner: BybitBroker,
-        cooldown_seconds: float = DEFAULT_COOLDOWN_SECONDS,
-    ) -> None:
-        self._inner = inner
-        self.cooldown_seconds = cooldown_seconds
-        self._last_order_ts: dict[str, float] = {}
-
-    async def place_order(self, order: Order) -> Order:
-        result = await self._inner.place_order(order)
-        if result.status not in (OrderStatus.REJECTED, OrderStatus.CANCELLED):
-            self._last_order_ts[order.symbol] = time.time()
-        return result
-
-    def __getattr__(self, name: str) -> Any:  # noqa: ANN401
-        # Proxy attribute access to the wrapped broker; return type is
-        # genuinely arbitrary because it forwards any broker attribute.
-        return getattr(self._inner, name)
-
-
-class CooledTradingLoop(TradingLoop):
-    """TradingLoop that ignores new signals while a symbol is in cooldown."""
-
-    def _make_prediction(self, symbol: str) -> LivePrediction:
-        broker = self._broker
-        if isinstance(broker, CooldownBrokerWrapper):
-            last = broker._last_order_ts.get(symbol)
-            if last is not None and time.time() - last < broker.cooldown_seconds:
-                return LivePrediction(
-                    symbol=symbol,
-                    direction=0.0,
-                    magnitude=0.0,
-                    volatility=0.01,
-                    confidence=0.0,
-                    horizon=self._config.horizon,
-                    ts=_utc_now_iso(),
-                )
-        return super()._make_prediction(symbol)
 
 
 class SingleSymbolPollingFeed:
@@ -166,10 +115,6 @@ class SingleSymbolPollingFeed:
         if self._adapter is not None:
             await self._adapter.aclose()
             self._adapter = None
-
-
-def _utc_now_iso() -> str:
-    return datetime.now(UTC).isoformat()
 
 
 def _setup_logging(log_file: Path) -> logging.Logger:

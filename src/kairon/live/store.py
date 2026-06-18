@@ -444,6 +444,21 @@ class LiveStore:
             "last_signal_ts": row[4],
         }
 
+    def get_heartbeat_history(self, limit: int = 120) -> list[dict[str, object]]:
+        """Return the last ``limit`` heartbeat rows, oldest-first.
+
+        Feeds the equity sparkline on the live dashboard. Skips rows whose
+        ``equity`` is NULL so the chart only plots real equity samples.
+        """
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT ts, equity FROM live_heartbeat "
+                "WHERE equity IS NOT NULL ORDER BY id DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        rows = list(reversed(rows))
+        return [{"ts": r[0], "equity": r[1]} for r in rows]
+
     def get_recent_orders(self, limit: int = 50) -> list[dict[str, object]]:
         """Return recent orders ordered by timestamp descending."""
         with self._lock:
