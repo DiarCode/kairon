@@ -19,6 +19,7 @@ The loop is fully async and designed to run inside an ``asyncio`` event loop.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import uuid
@@ -105,6 +106,8 @@ class TradingLoop:
 
         # Track which order opened each position (for decision outcome tracking)
         self._position_entry_orders: dict[str, str] = {}
+        # Track the entry timestamp of each open position (for trade duration)
+        self._position_entry_ts: dict[str, str] = {}
 
         # Rolling bar buffer for the strategy (stores raw bar dicts)
         self._bar_buffer: dict[str, deque[dict]] = {}
@@ -168,6 +171,11 @@ class TradingLoop:
         realized PnL with the broker's current unrealized PnL on the open
         position and mark the outcome ``manual_close``.
 
+        We also write a ``closed_trade`` row (exit price derived from the
+        unrealized PnL) so the session report counts this as a round-trip trade
+        with a locally-journaled realized PnL, instead of relying solely on
+        Bybit's closed-PnL endpoint.
+
         Call after :meth:`stop` and *before* flattening, while the position still
         exists on the broker.
         """
@@ -181,7 +189,40 @@ class TradingLoop:
                 logger.warning("finalize_open_positions: get_positions failed for %s: %s", symbol, e)
                 continue
             pos = next((p for p in positions if p.symbol == symbol), None)
-            realized = float(pos.unrealized_pnl or 0.0) if pos and pos.qty > 1e-9 else 0.0
+            realized = 0.0
+            if pos is not None and pos.qty > 1e-9:
+                realized = float(pos.unrealized_pnl or 0.0)
+                # Approximate the exit price from the unrealized PnL so the
+                # session report records this as a round-trip trade. The actual
+                # close happens moments later in _flatten; this mark-price
+                # approximation matches the decision-outcome PnL we record.
+                entry_price = pos.avg_entry
+                if pos.side == OrderSide.BUY:
+                    exit_price = entry_price + realized / pos.qty
+                else:
+                    exit_price = entry_price - realized / pos.qty
+                entry_ts = self._position_entry_ts.get(symbol, now_ts)
+                try:
+                    duration_s = (
+                        datetime.fromisoformat(now_ts) - datetime.fromisoformat(entry_ts)
+                    ).total_seconds()
+                except (ValueError, TypeError):
+                    duration_s = None
+                try:
+                    self._store.write_closed_trade(
+                        symbol=symbol,
+                        side=pos.side.value,
+                        entry_qty=pos.qty,
+                        entry_price=entry_price,
+                        exit_price=exit_price,
+                        realized_pnl=round(realized, 8),
+                        fee=0.0,
+                        entry_ts=entry_ts,
+                        exit_ts=now_ts,
+                        duration_seconds=duration_s,
+                    )
+                except Exception:
+                    logger.debug("finalize_open_positions: could not write closed trade for %s", symbol)
             try:
                 self._store.update_decision_outcome(
                     order_id=order_id,
@@ -230,8 +271,14 @@ class TradingLoop:
             logger.exception("TradingLoop crashed")
             raise
 
-    async def _process_tick(self, bar: Any) -> None:
-        """Process a single closed bar (one tick)."""
+    async def _process_tick(self, bar: Any) -> None:  # noqa: PLR0911
+        """Process a single closed bar (one tick).
+
+        The return count is high by design: each guard (extract failure, warm-up,
+        no equity, cooldown, no delta, guardian block) is a clear early-exit.
+        Merging them would bury the control flow, so the complexity-threshold
+        rule is suppressed here rather than refactored.
+        """
         self._tick_count += 1
 
         # Extract symbol and close price from the bar
@@ -553,10 +600,6 @@ class TradingLoop:
         self, symbol: str, side: OrderSide, qty: float, price: float, filled: Order
     ) -> None:
         """Update the position tracking dict, persist to store, and record closed trades."""
-        # Track entry timestamp for duration calculation
-        if not hasattr(self, '_position_entry_ts'):
-            self._position_entry_ts: dict[str, str] = {}
-
         if symbol in self._positions:
             pos = self._positions[symbol]
             if side == pos.side:
@@ -762,7 +805,7 @@ class TradingLoop:
 
     def _bar_to_dict(self, bar: Any) -> dict:
         """Convert a bar table to a dict for the buffer."""
-        try:
+        with contextlib.suppress(Exception):
             if hasattr(bar, "column"):
                 close = float(bar.column("close")[0].as_py()) if hasattr(bar.column("close")[0], "as_py") else float(bar.column("close")[0])
                 return {
@@ -772,8 +815,6 @@ class TradingLoop:
                     "close": close,
                     "volume": float(bar.column("volume")[0].as_py()) if hasattr(bar.column("volume")[0], "as_py") else float(bar.column("volume")[0]),
                 }
-        except Exception:
-            pass
         return {}
 
     def _buffer_to_table(self, symbol: str) -> pa.Table | None:
@@ -803,23 +844,19 @@ class TradingLoop:
 
     def _extract_symbol(self, bar: Any) -> str:
         """Extract the symbol from a bar table. Falls back to first configured symbol."""
-        try:
+        with contextlib.suppress(Exception):
             if hasattr(bar, "column") and "symbol" in bar.column_names:
                 return str(bar.column("symbol")[0])
-        except Exception:
-            pass
         return self._config.symbols[0] if self._config.symbols else "BTC-USDT-PERP"
 
     def _extract_close(self, bar: Any) -> float:
         """Extract the close price from a bar table."""
-        try:
+        with contextlib.suppress(Exception):
             if hasattr(bar, "column"):
                 for col_name in ("close", "Close", "c"):
                     if col_name in bar.column_names:
                         val = bar.column(col_name)[0]
                         return float(val.as_py() if hasattr(val, "as_py") else val)
-        except Exception:
-            pass
         raise ValueError("Cannot extract close price from bar")
 
     def _get_usdt_equity(self, balances: list[Any]) -> float:

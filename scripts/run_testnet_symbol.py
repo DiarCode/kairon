@@ -11,17 +11,19 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import logging
 import signal
 import sys
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from kairon.config import KaironSettings
-from kairon.data.symbols import CryptoVenue, crypto_perp
+from kairon.data.adapters.ccxt_adapter import CCXTAdapter
+from kairon.data.symbols import CryptoVenue, Symbol, crypto_perp
 from kairon.live.analytics import compute_session_report, format_report
 from kairon.live.broker.base import Order, OrderStatus
 from kairon.live.broker.bybit import BybitBroker
@@ -46,7 +48,11 @@ class CooldownBrokerWrapper:
     testnet sessions.
     """
 
-    def __init__(self, inner: BybitBroker, cooldown_seconds: float = DEFAULT_COOLDOWN_SECONDS) -> None:
+    def __init__(
+        self,
+        inner: BybitBroker,
+        cooldown_seconds: float = DEFAULT_COOLDOWN_SECONDS,
+    ) -> None:
         self._inner = inner
         self.cooldown_seconds = cooldown_seconds
         self._last_order_ts: dict[str, float] = {}
@@ -57,7 +63,9 @@ class CooldownBrokerWrapper:
             self._last_order_ts[order.symbol] = time.time()
         return result
 
-    def __getattr__(self, name: str) -> Any:
+    def __getattr__(self, name: str) -> Any:  # noqa: ANN401
+        # Proxy attribute access to the wrapped broker; return type is
+        # genuinely arbitrary because it forwards any broker attribute.
         return getattr(self._inner, name)
 
 
@@ -91,7 +99,7 @@ class SingleSymbolPollingFeed:
 
     def __init__(
         self,
-        symbol,
+        symbol: Symbol,
         *,
         timeframe: str = "1m",
         history_minutes: int = DEFAULT_HISTORY_MINUTES,
@@ -106,10 +114,6 @@ class SingleSymbolPollingFeed:
         self._running = False
 
     async def run(self) -> None:
-        from datetime import UTC, datetime, timedelta
-        from kairon.data.adapters.ccxt_adapter import CCXTAdapter
-        from kairon.data.symbols import CryptoVenue
-
         self._adapter = CCXTAdapter(venue=CryptoVenue.BYBIT, testnet=True)
         self._running = True
         logger = logging.getLogger(__name__)
@@ -127,7 +131,10 @@ class SingleSymbolPollingFeed:
             table = await self._adapter.afetch(self.symbol, self.timeframe, start, end)
             n = table.num_rows
             if n > 0:
-                logger.info("PollingFeed: loaded %d historical bars for %s", n, self.symbol.canonical)
+                logger.info(
+                    "PollingFeed: loaded %d historical bars for %s",
+                    n, self.symbol.canonical,
+                )
                 for i in range(n):
                     await self.queue.put(table.slice(i, 1))
         except Exception as e:
@@ -136,7 +143,6 @@ class SingleSymbolPollingFeed:
         last_ts = None
         while self._running:
             try:
-                from datetime import UTC, datetime, timedelta
                 end = datetime.now(UTC)
                 start = end - timedelta(minutes=2)
                 table = await self._adapter.afetch(self.symbol, self.timeframe, start, end)
@@ -169,11 +175,9 @@ def _utc_now_iso() -> str:
 def _setup_logging(log_file: Path) -> logging.Logger:
     log_file.parent.mkdir(parents=True, exist_ok=True)
     # Ensure UTF-8 on Windows terminals so pybit's unicode arrows do not crash logging.
-    try:
+    with contextlib.suppress(Exception):
         sys.stdout.reconfigure(encoding="utf-8")
         sys.stderr.reconfigure(encoding="utf-8")
-    except Exception:
-        pass
     root = logging.getLogger()
     root.setLevel(logging.INFO)
     # Clear existing handlers so repeated imports in tests do not duplicate.
@@ -218,7 +222,7 @@ async def _flatten(broker: BybitBroker, store: LiveStore, symbol: str) -> None:
         logger.info("Position fully flattened for %s", symbol)
 
 
-async def _run_symbol_session(
+async def _run_symbol_session(  # noqa: PLR0915
     symbol_str: str,
     db_path: Path,
     log_file: Path,
@@ -308,19 +312,26 @@ async def _run_symbol_session(
         shutdown_event.set()
 
     for sig in (signal.SIGINT, signal.SIGTERM):
-        try:
+        # Windows may not support add_signal_handler.
+        with contextlib.suppress(NotImplementedError, ValueError):
             asyncio.get_running_loop().add_signal_handler(sig, _on_signal, sig)
-        except (NotImplementedError, ValueError):
-            pass  # Windows may not support add_signal_handler
 
     try:
+        # Keep strong references to the background tasks so they are not
+        # garbage-collected mid-flight (an asyncio gotcha) while we wait on
+        # the shutdown event.
+        background_tasks: set[asyncio.Task] = set()
         feed_task = asyncio.create_task(feed.run(), name=f"feed-{symbol_str}")
+        background_tasks.add(feed_task)
+        feed_task.add_done_callback(background_tasks.discard)
         loop_task = asyncio.create_task(loop.start(), name=f"loop-{symbol_str}")
+        background_tasks.add(loop_task)
+        loop_task.add_done_callback(background_tasks.discard)
 
         # Run until duration expires or a signal/external halt occurs.
         try:
             await asyncio.wait_for(shutdown_event.wait(), timeout=duration_seconds)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.info("Session duration reached for %s", symbol_str)
         except asyncio.CancelledError:
             logger.info("Session cancelled for %s", symbol_str)
@@ -398,10 +409,14 @@ def main() -> None:
     parser.add_argument("symbol", help="Canonical symbol, e.g. BTC-USDT-PERP")
     parser.add_argument("--db", required=True, help="Path to SQLite store")
     parser.add_argument("--log", required=True, help="Path to log file")
-    parser.add_argument("--duration", type=int, default=DEFAULT_DURATION_SECONDS, help="Seconds to run")
+    parser.add_argument(
+        "--duration", type=int, default=DEFAULT_DURATION_SECONDS, help="Seconds to run"
+    )
     args = parser.parse_args()
 
-    result = asyncio.run(_run_symbol_session(args.symbol, Path(args.db), Path(args.log), args.duration))
+    result = asyncio.run(
+        _run_symbol_session(args.symbol, Path(args.db), Path(args.log), args.duration)
+    )
     # Exit non-zero if the session had critical errors and zero trades.
     if result["report"].n_orders == 0 and result["initial_balance"] == result["final_balance"]:
         pass  # This is actually fine for a quiet market.

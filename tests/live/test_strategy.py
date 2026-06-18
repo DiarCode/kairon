@@ -266,7 +266,7 @@ class TestMACDIndicator:
 
     def test_macd_basic(self) -> None:
         closes = np.array([44.0 + i * 0.5 for i in range(50)])
-        macd_line, signal_line, histogram = _macd(closes, fast=12, slow=26, signal=9)
+        macd_line, _signal_line, histogram = _macd(closes, fast=12, slow=26, signal=9)
         assert len(macd_line) == 50
         assert len(histogram) == 50
         # MACD line should have NaN values during warmup
@@ -322,7 +322,7 @@ class TestStochastic:
         closes = np.cumsum(rng.normal(0, 0.5, n)) + 50000
         highs = closes + rng.uniform(0, 50, n)
         lows = closes - rng.uniform(0, 50, n)
-        k_line, d_line = _stochastic(highs, lows, closes, k_period=14, d_period=3)
+        k_line, _d_line = _stochastic(highs, lows, closes, k_period=14, d_period=3)
         assert len(k_line) == n
         # %K should be between 0 and 100 after warmup
         valid_k = k_line[~np.isnan(k_line)]

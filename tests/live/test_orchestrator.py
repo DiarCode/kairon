@@ -226,7 +226,7 @@ class TestTradingLoopKillSwitch:
             store = LiveStore(Path(tmpdir) / "test.db")
             feed = MockFeed()
 
-            loop = TradingLoop(
+            _loop = TradingLoop(
                 config=config,
                 broker=broker,
                 predictor=predictor,
@@ -276,7 +276,7 @@ class TestTradingLoopWarmup:
 
             # Process ticks during warm-up
             # Warm-up bars should not place orders
-            for i in range(3):
+            for _ in range(3):
                 # Simulate a tick
                 await loop._process_tick(None)  # type: ignore[arg-type]
 
@@ -344,10 +344,10 @@ class TestTradingLoopGuardian:
 
     @pytest.mark.asyncio
     async def test_guardian_halts_on_daily_loss(self) -> None:
-        config = _make_config(warmup_bars=0)
-        broker = MockBroker()
-        predictor = MockPredictor()
-        guardian = Guardian(max_daily_loss_pct=0.03)
+        _config = _make_config(warmup_bars=0)
+        _broker = MockBroker()
+        _predictor = MockPredictor()
+        _guardian = Guardian(max_daily_loss_pct=0.03)
 
         with TemporaryDirectory() as tmpdir:
             store = LiveStore(Path(tmpdir) / "test.db")
@@ -379,7 +379,7 @@ class TestTradingLoopStore:
             store = LiveStore(Path(tmpdir) / "test.db")
             feed = MockFeed()
 
-            loop = TradingLoop(
+            _loop = TradingLoop(
                 config=config,
                 broker=broker,
                 predictor=predictor,
@@ -489,7 +489,10 @@ class TestTradingLoopFinalizeOpenPositions:
         """
         from kairon.live.journal import TradeDecision
 
-        with TemporaryDirectory() as tmpdir:
+        # ignore_cleanup_errors: on Windows the sqlite file handle can linger
+        # briefly after close(), racing the temp-dir teardown. This is a
+        # platform tempfile/sqlite quirk, not a test-logic concern.
+        with TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             store = LiveStore(Path(tmpdir) / "test.db")
             config = _make_config()
             broker = MockBroker()
@@ -540,6 +543,7 @@ class TestTradingLoopFinalizeOpenPositions:
                 )
             ]
             loop._position_entry_orders["BTC-USDT-PERP"] = order_id
+            loop._position_entry_ts["BTC-USDT-PERP"] = "2026-06-18T06:32:00+00:00"
 
             await loop.finalize_open_positions()
 
@@ -547,12 +551,23 @@ class TestTradingLoopFinalizeOpenPositions:
             assert len(decisions) == 1
             assert decisions[0].outcome == "manual_close"
             assert decisions[0].outcome_pnl == 42.0
+
+            # A round-trip trade is also journaled so the session report counts
+            # it (exit price derived from unrealized PnL: 185000 - 42/0.014).
+            trades = store.get_closed_trades("BTC-USDT-PERP")
+            assert len(trades) == 1
+            trade = trades[0]
+            assert trade["side"] == "Sell"
+            assert trade["entry_qty"] == 0.014
+            assert trade["entry_price"] == 185000.0
+            assert abs(trade["exit_price"] - 182000.0) < 1e-6
+            assert trade["realized_pnl"] == 42.0
             store.close()
 
     @pytest.mark.asyncio
     async def test_finalize_noop_without_open_positions(self) -> None:
         """finalize_open_positions is a no-op when no positions are tracked."""
-        with TemporaryDirectory() as tmpdir:
+        with TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             store = LiveStore(Path(tmpdir) / "test.db")
             config = _make_config()
             broker = MockBroker()
