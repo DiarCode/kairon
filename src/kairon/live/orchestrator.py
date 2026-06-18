@@ -158,6 +158,45 @@ class TradingLoop:
         self._fill_task = None
         logger.info("TradingLoop stopped after %d ticks", self._tick_count)
 
+    async def finalize_open_positions(self) -> None:
+        """Record a ``manual_close`` outcome for any position still open at shutdown.
+
+        Positions closed by the session-end flatten bypass ``_update_position``
+        (the fill-drain task has already stopped by the time ``_flatten`` runs),
+        so their entry decision would otherwise never receive an outcome and the
+        journal would report 0 closed decisions forever. We approximate the
+        realized PnL with the broker's current unrealized PnL on the open
+        position and mark the outcome ``manual_close``.
+
+        Call after :meth:`stop` and *before* flattening, while the position still
+        exists on the broker.
+        """
+        if not self._position_entry_orders:
+            return
+        now_ts = _utc_now_iso()
+        for symbol, order_id in list(self._position_entry_orders.items()):
+            try:
+                positions = await self._broker.get_positions(symbol)
+            except Exception as e:
+                logger.warning("finalize_open_positions: get_positions failed for %s: %s", symbol, e)
+                continue
+            pos = next((p for p in positions if p.symbol == symbol), None)
+            realized = float(pos.unrealized_pnl or 0.0) if pos and pos.qty > 1e-9 else 0.0
+            try:
+                self._store.update_decision_outcome(
+                    order_id=order_id,
+                    outcome="manual_close",
+                    pnl=round(realized, 8),
+                    ts=now_ts,
+                )
+            except Exception:
+                logger.debug("finalize_open_positions: could not update outcome for %s", order_id)
+                continue
+            logger.info(
+                "Finalized open decision %s for %s: outcome=manual_close pnl=%.6f",
+                order_id, symbol, realized,
+            )
+
     # --- Main loop -----------------------------------------------------------
 
     async def _run_loop(self) -> None:

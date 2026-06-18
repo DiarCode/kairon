@@ -4,28 +4,26 @@ from __future__ import annotations
 
 import numpy as np
 import pyarrow as pa
-import pytest
 
 from kairon.live.strategy import (
+    ComprehensiveStrategy,
     MACrossoverStrategy,
     MomentumStrategy,
-    ComprehensiveStrategy,
-    _ema,
-    _rsi,
-    _atr,
-    _macd,
     _adx,
+    _atr,
     _bollinger,
-    _stochastic,
     _cci,
-    _williams_r,
-    _obv,
-    _vwap,
-    _swing_pivots,
+    _ema,
     _fibonacci_levels,
+    _macd,
+    _obv,
     _regime_probabilities,
+    _rsi,
+    _stochastic,
+    _swing_pivots,
+    _vwap,
+    _williams_r,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helper: generate synthetic OHLCV bars
@@ -43,7 +41,7 @@ def _make_bars(n: int, base_price: float = 50000.0, volatility: float = 0.001) -
     lows = closes * (1 - rng.uniform(0, 0.002, size=n))
     opens = closes * (1 + rng.uniform(-0.001, 0.001, size=n))
     volumes = rng.uniform(100, 1000, size=n)
-    from datetime import UTC, datetime, timedelta
+    from datetime import UTC, datetime
     ts = [datetime(2026, 1, 1, 0, i, 0, tzinfo=UTC) for i in range(n)]
 
     return pa.table(
@@ -219,7 +217,7 @@ class TestMACrossoverStrategy:
     def test_strategy_state_persists(self) -> None:
         strategy = MACrossoverStrategy()
         bars = _make_bars(30)
-        pred1 = strategy.predict(bars, "BTC-USDT-PERP")
+        strategy.predict(bars, "BTC-USDT-PERP")
         # _prev_fast and _prev_slow should be set
         assert strategy._prev_fast is not None
         assert strategy._prev_slow is not None
@@ -487,7 +485,7 @@ class TestComprehensiveStrategy:
     def test_snapshot_populated(self) -> None:
         strategy = ComprehensiveStrategy()
         bars = _make_bars(50)
-        pred = strategy.predict(bars, "BTC-USDT-PERP")
+        strategy.predict(bars, "BTC-USDT-PERP")
         snapshot = strategy.last_indicator_snapshot
         assert snapshot is not None
         # Key indicators should be populated after warmup
@@ -506,7 +504,7 @@ class TestComprehensiveStrategy:
     def test_confluence_scores_populated(self) -> None:
         strategy = ComprehensiveStrategy()
         bars = _make_bars(50)
-        pred = strategy.predict(bars, "BTC-USDT-PERP")
+        strategy.predict(bars, "BTC-USDT-PERP")
         scores = strategy.last_confluence_scores
         assert isinstance(scores, dict)
 
@@ -530,3 +528,140 @@ class TestComprehensiveStrategy:
         # LivePrediction should always have justifications field
         assert hasattr(pred, "justifications")
         assert isinstance(pred.justifications, tuple)
+
+
+# ---------------------------------------------------------------------------
+# Trend-direction + counter-trend gate tests
+# ---------------------------------------------------------------------------
+
+
+def _make_strong_trend(n: int, direction: float, volume: float = 500.0) -> pa.Table:
+    """Monotonic trend with constant volume (so the volume gate never flattens)."""
+    base_price = 50000.0
+    step = 60.0 * direction
+    closes = [base_price + step * i for i in range(n)]
+    highs = [c * 1.0005 for c in closes]
+    lows = [c * 0.9995 for c in closes]
+    opens = closes
+    volumes = [volume] * n
+    from datetime import UTC, datetime
+    ts = [datetime(2026, 1, 1, 0, i, 0, tzinfo=UTC) for i in range(n)]
+    return pa.table(
+        {
+            "ts": ts,
+            "open": opens,
+            "high": highs,
+            "low": lows,
+            "close": closes,
+            "volume": volumes,
+        },
+        schema=pa.schema([
+            ("ts", pa.timestamp("us", tz="UTC")),
+            ("open", pa.float64()),
+            ("high", pa.float64()),
+            ("low", pa.float64()),
+            ("close", pa.float64()),
+            ("volume", pa.float64()),
+        ]),
+    )
+
+
+def _make_divergence_uptrend(n: int = 80) -> pa.Table:
+    """Price trends UP but OBV diverges DOWN — the bug scenario.
+
+    Up-bars drift +0.5% on tiny volume; every 10th bar is a small -0.15% dip on
+    huge volume. Net price rises strongly (EMA bullish, MACD positive, ADX high,
+    price above VWAP) yet OBV falls, RSI is overbought, and price is near swing
+    highs — the exact mix that previously made the strategy SHORT into an
+    uptrend. After the fix this must not produce a short.
+    """
+    base_price = 50000.0
+    closes: list[float] = []
+    volumes: list[float] = []
+    price = base_price
+    for i in range(n):
+        if i > 0 and i % 10 == 0:
+            price *= (1 - 0.0015)
+            volumes.append(8000.0)
+        else:
+            price *= (1 + 0.005)
+            volumes.append(20.0)
+        closes.append(price)
+    highs = [c * 1.0002 for c in closes]
+    lows = [c * 0.9998 for c in closes]
+    opens = closes
+    from datetime import UTC, datetime
+    ts = [datetime(2026, 1, 1, 0, i // 60, i % 60, tzinfo=UTC) for i in range(n)]
+    return pa.table(
+        {
+            "ts": ts,
+            "open": opens,
+            "high": highs,
+            "low": lows,
+            "close": closes,
+            "volume": volumes,
+        },
+        schema=pa.schema([
+            ("ts", pa.timestamp("us", tz="UTC")),
+            ("open", pa.float64()),
+            ("high", pa.float64()),
+            ("low", pa.float64()),
+            ("close", pa.float64()),
+            ("volume", pa.float64()),
+        ]),
+    )
+
+
+class TestComprehensiveStrategyTrendGate:
+    """Verify the EMA first-call fix and the counter-trend gate."""
+
+    def test_fresh_uptrend_is_long(self) -> None:
+        """A fresh strategy on a clear uptrend must vote LONG on the first call.
+
+        Before the EMA first-call fix, _prev_fast/_prev_slow were None so the
+        entire EMA directional block was skipped and the trend vote vanished
+        from direction_raw, leaving mean-reversion noise to decide.
+        """
+        strategy = ComprehensiveStrategy()
+        bars = _make_strong_trend(60, direction=1.0)
+        pred = strategy.predict(bars, "BTC-USDT-PERP")
+        snap = strategy.last_indicator_snapshot
+        # Sanity: the trend really is strong and EMA is bullish.
+        assert snap["adx"] > 22
+        assert snap["ema_fast"] > snap["ema_slow"]
+        assert pred.direction == 1.0, (
+            f"expected LONG on clear uptrend, got direction={pred.direction}; "
+            f"justifications={pred.justifications}"
+        )
+
+    def test_fresh_downtrend_is_short(self) -> None:
+        """A fresh strategy on a clear downtrend must vote SHORT on the first call."""
+        strategy = ComprehensiveStrategy()
+        bars = _make_strong_trend(60, direction=-1.0)
+        pred = strategy.predict(bars, "BTC-USDT-PERP")
+        snap = strategy.last_indicator_snapshot
+        assert snap["adx"] > 22
+        assert snap["ema_fast"] < snap["ema_slow"]
+        assert pred.direction == -1.0, (
+            f"expected SHORT on clear downtrend, got direction={pred.direction}; "
+            f"justifications={pred.justifications}"
+        )
+
+    def test_no_short_into_strong_uptrend(self) -> None:
+        """The divergence bug scenario must not produce a short.
+
+        Price trends up (EMA bullish, MACD positive, ADX strong, above VWAP) but
+        OBV diverges down and price is overbought/near swing highs. Before the
+        fix this yielded a SHORT into a strong uptrend. After the fix it is
+        either LONG (aligned) or flattened — never SHORT.
+        """
+        strategy = ComprehensiveStrategy()
+        bars = _make_divergence_uptrend(80)
+        pred = strategy.predict(bars, "BTC-USDT-PERP")
+        snap = strategy.last_indicator_snapshot
+        # The trend is up: EMA bullish and strong.
+        assert snap["ema_fast"] > snap["ema_slow"]
+        assert pred.direction != -1.0, (
+            "strategy shorted into a strong uptrend (divergence scenario); "
+            f"direction={pred.direction}; justifications={pred.justifications}"
+        )

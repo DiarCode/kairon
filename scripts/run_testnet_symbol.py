@@ -328,6 +328,13 @@ async def _run_symbol_session(
         logger.exception("Runtime error for %s: %s", symbol_str, e)
     finally:
         await loop.stop()
+        # Record an outcome for any position still open BEFORE flattening it.
+        # The fill-drain task has now stopped, so the flatten close would bypass
+        # _update_position and leave the entry decision without an outcome.
+        try:
+            await loop.finalize_open_positions()
+        except Exception as e:
+            logger.warning("finalize_open_positions failed for %s: %s", symbol_str, e)
         await _flatten(broker, store, symbol_str)
         await feed.aclose()
         await broker.aclose()

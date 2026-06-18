@@ -774,20 +774,31 @@ class ComprehensiveStrategy:
         ema_bullish = False
         ema_bearish = False
 
+        # Classify the EMA trend direction from the current fast/slow relationship.
+        # This must NOT depend on _prev_*: on the first prediction after warmup the
+        # previous EMAs are None, but the trend direction is still knowable and must
+        # contribute its vote to direction_raw. Without this, the very first
+        # decision of every session loses its primary trend-following cue (the EMA
+        # term in direction_raw vanishes) and mean-reversion noise can flip the sign.
+        if not math.isnan(current_fast) and not math.isnan(current_slow):
+            if current_fast > current_slow:
+                ema_bullish = True
+            elif current_fast < current_slow:
+                ema_bearish = True
+
         if self._prev_fast is not None and self._prev_slow is not None:
-            if not math.isnan(current_fast) and not math.isnan(current_slow):
-                if self._prev_fast <= self._prev_slow and current_fast > current_slow:
-                    trend_score = _apply_score(trend_score, 0.15, "Bullish EMA crossover")
-                    ema_bullish = True
-                elif self._prev_fast >= self._prev_slow and current_fast < current_slow:
-                    trend_score = _apply_score(trend_score, 0.15, "Bearish EMA crossover")
-                    ema_bearish = True
-                elif current_fast > current_slow:
-                    trend_score = _apply_score(trend_score, 0.08, "EMA trend continuation (bullish)")
-                    ema_bullish = True
-                elif current_fast < current_slow:
-                    trend_score = _apply_score(trend_score, 0.08, "EMA trend continuation (bearish)")
-                    ema_bearish = True
+            if self._prev_fast <= self._prev_slow and current_fast > current_slow:
+                trend_score = _apply_score(trend_score, 0.15, "Bullish EMA crossover")
+            elif self._prev_fast >= self._prev_slow and current_fast < current_slow:
+                trend_score = _apply_score(trend_score, 0.15, "Bearish EMA crossover")
+            elif ema_bullish:
+                trend_score = _apply_score(trend_score, 0.08, "EMA trend continuation (bullish)")
+            elif ema_bearish:
+                trend_score = _apply_score(trend_score, 0.08, "EMA trend continuation (bearish)")
+        elif ema_bullish:
+            trend_score = _apply_score(trend_score, 0.08, "EMA trend continuation (bullish)")
+        elif ema_bearish:
+            trend_score = _apply_score(trend_score, 0.08, "EMA trend continuation (bearish)")
 
         if not math.isnan(current_adx):
             if current_adx > 25:
@@ -996,11 +1007,30 @@ class ComprehensiveStrategy:
             confidence = self.confidence_floor
             justifications.append("Stressed regime; signal flattened")
 
-        # Trend alignment for high-confidence signals
-        if confidence > 0.6 and direction != 0.0:
+        # Trend alignment: refuse to trade against a strong trend.
+        # Mean-reversion cues (upper Bollinger band, swing-high resistance,
+        # Williams %R overbought, OBV divergence) can push direction_raw the
+        # wrong way even when the trend is clearly against them — that is how
+        # the strategy would short into a strong uptrend. The EMA trend direction
+        # is the authoritative trend filter: a signal that disagrees with it in a
+        # strong trend (ADX > 25) is flattened, and in a moderate trend
+        # (ADX > 22) its confidence is capped. MACD disagreement alone (e.g. a
+        # steady-slope trend where the MACD histogram ~ 0) is NOT a counter-trend
+        # condition, so it only caps confidence rather than flattening.
+        if direction != 0.0 and not math.isnan(current_adx):
             ema_aligned = (direction > 0 and ema_bullish) or (direction < 0 and ema_bearish)
             macd_aligned = (direction > 0 and current_hist > 0) or (direction < 0 and current_hist < 0)
-            if not (ema_aligned and macd_aligned):
+            if not ema_aligned:
+                if current_adx > 25:
+                    justifications.append(
+                        f"Counter-trend signal in strong trend (ADX={current_adx:.1f}); flattened"
+                    )
+                    direction = 0.0
+                    confidence = self.confidence_floor
+                elif current_adx > 22 and confidence > 0.6:
+                    confidence = min(confidence, 0.6)
+                    justifications.append("Trend alignment check capped confidence")
+            elif not macd_aligned and confidence > 0.6:
                 confidence = min(confidence, 0.6)
                 justifications.append("Trend alignment check capped confidence")
 

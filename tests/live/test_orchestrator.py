@@ -10,7 +10,6 @@ import pytest
 
 from kairon.live.broker.base import (
     Balance,
-    Broker,
     Order,
     OrderSide,
     OrderStatus,
@@ -22,7 +21,6 @@ from kairon.live.guardian import Guardian
 from kairon.live.orchestrator import TradingLoop
 from kairon.live.reconciler import Reconciler
 from kairon.live.store import LiveStore
-
 
 # ---------------------------------------------------------------------------
 # Mock broker for testing
@@ -474,4 +472,110 @@ class TestTradingLoopLifecycle:
             assert loop.is_running
 
             await loop.stop()
+            store.close()
+
+
+class TestTradingLoopFinalizeOpenPositions:
+    """Verify decision outcomes are written for positions open at shutdown."""
+
+    @pytest.mark.asyncio
+    async def test_finalize_writes_manual_close_outcome(self) -> None:
+        """A position still open at shutdown gets a manual_close outcome.
+
+        Reproduces the 0-closed-decisions bug: positions closed by the
+        session-end flatten bypass _update_position (fill-drain has stopped),
+        so without finalize_open_positions the entry decision never receives
+        an outcome and the analyzer reports 0 closed decisions forever.
+        """
+        from kairon.live.journal import TradeDecision
+
+        with TemporaryDirectory() as tmpdir:
+            store = LiveStore(Path(tmpdir) / "test.db")
+            config = _make_config()
+            broker = MockBroker()
+            predictor = MockPredictor()
+            guardian = Guardian(
+                max_position_equity_fraction=0.25,
+                max_total_leverage=3,
+                max_open_positions=5,
+                max_daily_loss_pct=0.03,
+                store=store,
+            )
+            reconciler = Reconciler(store=store, broker=broker)
+            feed = MockFeed()
+            loop = TradingLoop(
+                config=config,
+                broker=broker,
+                predictor=predictor,
+                strategy=None,
+                guardian=guardian,
+                reconciler=reconciler,
+                store=store,
+                feed=feed,
+            )
+
+            # Seed an entry decision and an open position on the broker.
+            order_id = "entry-001"
+            store.write_decision(
+                TradeDecision(
+                    order_id=order_id,
+                    symbol="BTC-USDT-PERP",
+                    timestamp="2026-06-18T06:32:00+00:00",
+                    strategy_name="ComprehensiveStrategy",
+                    direction=-1.0,
+                    confidence=0.528,
+                    magnitude=0.01,
+                    volatility=0.01,
+                    horizon="day",
+                )
+            )
+            broker._positions = [
+                Position(
+                    symbol="BTC-USDT-PERP",
+                    side=OrderSide.SELL,
+                    qty=0.014,
+                    avg_entry=185000.0,
+                    unrealized_pnl=42.0,
+                    ts="2026-06-18T06:32:00+00:00",
+                )
+            ]
+            loop._position_entry_orders["BTC-USDT-PERP"] = order_id
+
+            await loop.finalize_open_positions()
+
+            decisions = store.get_decisions()
+            assert len(decisions) == 1
+            assert decisions[0].outcome == "manual_close"
+            assert decisions[0].outcome_pnl == 42.0
+            store.close()
+
+    @pytest.mark.asyncio
+    async def test_finalize_noop_without_open_positions(self) -> None:
+        """finalize_open_positions is a no-op when no positions are tracked."""
+        with TemporaryDirectory() as tmpdir:
+            store = LiveStore(Path(tmpdir) / "test.db")
+            config = _make_config()
+            broker = MockBroker()
+            predictor = MockPredictor()
+            guardian = Guardian(
+                max_position_equity_fraction=0.25,
+                max_total_leverage=3,
+                max_open_positions=5,
+                max_daily_loss_pct=0.03,
+                store=store,
+            )
+            reconciler = Reconciler(store=store, broker=broker)
+            loop = TradingLoop(
+                config=config,
+                broker=broker,
+                predictor=predictor,
+                strategy=None,
+                guardian=guardian,
+                reconciler=reconciler,
+                store=store,
+                feed=MockFeed(),
+            )
+            # No entry orders tracked -> no broker calls, no errors.
+            await loop.finalize_open_positions()
+            assert store.get_decisions() == []
             store.close()
