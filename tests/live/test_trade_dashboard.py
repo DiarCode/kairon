@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
 
-from kairon.live.broker.base import Order, OrderSide, OrderStatus, OrderType, Position
+from kairon.live.broker.base import Order, OrderSide, OrderStatus, OrderType
 from kairon.live.store import LiveStore
-
 
 # ---------------------------------------------------------------------------
 # LiveStore dashboard query tests
@@ -125,10 +123,14 @@ class TestTradeScreenImports:
     """Verify all trade screen handlers are importable."""
 
     def test_trade_screen_importable(self) -> None:
+        # The web/screens layer depends on the optional `api` extra (fastapi).
+        # Skip cleanly when it isn't installed rather than erroring on import.
+        pytest.importorskip("fastapi")
         from kairon.ui.web.screens import trade_screen
         assert trade_screen is not None
 
     def test_trade_api_importable(self) -> None:
+        pytest.importorskip("fastapi")
         from kairon.ui.web.screens import (
             trade_events,
             trade_halt,

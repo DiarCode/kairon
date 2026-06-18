@@ -44,7 +44,9 @@ class TestLiveConfig:
         assert config.dry_run is True
 
     def test_from_settings_defaults(self) -> None:
-        settings = KaironSettings()
+        # _env_file=None: assert true field defaults, not the developer's
+        # local .env overrides (e.g. KAIRON_LIVE_SYMBOLS / KAIRON_LIVE_DRY_RUN).
+        settings = KaironSettings(_env_file=None)
         config = LiveConfig.from_settings(settings)
         assert config.symbols == ("BTC-USDT-PERP", "ETH-USDT-PERP")
         assert config.dry_run is True
@@ -72,7 +74,8 @@ class TestKaironSettingsLiveFields:
         assert hasattr(settings, "live_promotion_ack")
 
     def test_defaults(self) -> None:
-        settings = KaironSettings()
+        # _env_file=None: assert true field defaults, not local .env overrides.
+        settings = KaironSettings(_env_file=None)
         assert settings.bybit_testnet is True
         assert settings.live_dry_run is True
         assert settings.live_symbols == ("BTC-USDT-PERP", "ETH-USDT-PERP")
