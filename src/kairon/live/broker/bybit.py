@@ -593,10 +593,25 @@ class BybitBroker:
         except Exception as e:
             logger.debug("Could not fetch mark price for %s close: %s", symbol, e)
 
-        while remaining > 1e-9:
-            _, min_qty = _qty_step_and_min(symbol)
+        # Position-driven close loop. The thin testnet order book means a single
+        # market reduce-only order often only partially fills (e.g. 0.001 of a
+        # 0.015 chunk), so we must re-read the ACTUAL position after each order
+        # and measure real progress, rather than assuming the requested chunk
+        # filled. We chip away in lots up to ``chunk_qty``, falling back to a
+        # crossing IOC limit at the best opposing-side price when market orders
+        # stall, and give up only after several consecutive no-progress rounds.
+        _, min_qty = _qty_step_and_min(symbol)
+        no_progress = 0
+        max_rounds = 100
+        for _round in range(max_rounds):
+            positions = await self.get_positions(symbol)
+            pos = next((p for p in positions if p.symbol == symbol), None)
+            remaining = pos.qty if pos else 0.0
+            if remaining <= 1e-9:
+                break
+
             this_chunk = min(chunk_qty, remaining)
-            rounded_chunk = _round_qty(symbol, this_chunk)
+            rounded_chunk = max(_round_qty(symbol, this_chunk), min_qty)
             if rounded_chunk <= 0:
                 break
 
@@ -619,7 +634,6 @@ class BybitBroker:
                 try:
                     response = await asyncio.to_thread(http.place_order, **market_params)
                     result = response.get("result", {})
-                    broker_id = result.get("orderId", "")
                     last_order = Order(
                         id=order_id,
                         intent_id=intent_id,
@@ -629,7 +643,7 @@ class BybitBroker:
                         qty=rounded_chunk,
                         order_type=OrderType.MARKET,
                         status=OrderStatus.SUBMITTED,
-                        broker_id=broker_id or None,
+                        broker_id=result.get("orderId", "") or None,
                         ts=utc_now_iso(),
                     )
                     placed = True
@@ -647,49 +661,68 @@ class BybitBroker:
                     logger.error("close_position market order failed for %s: %s", symbol, e)
                     break
 
-            if not placed:
-                # Fallback: limit order slightly inside the spread.
-                limit_price = (
-                    mark_price * 0.9995
-                    if close_side == OrderSide.SELL
-                    else mark_price * 1.0005
-                )
-                limit_price = _round_price(symbol, limit_price)
-                limit_intent = uuid7()
-                self._intent_to_local[limit_intent] = order_id
-                limit_params: dict[str, Any] = {
-                    "category": category,
-                    "symbol": bybit_symbol,
-                    "side": order_side_to_bybit(close_side),
-                    "orderType": "Limit",
-                    "qty": str(rounded_chunk),
-                    "price": str(limit_price),
-                    "orderLinkId": limit_intent,
-                    "reduceOnly": True,
-                }
-                try:
-                    response = await asyncio.to_thread(http.place_order, **limit_params)
-                    result = response.get("result", {})
-                    last_order = Order(
-                        id=order_id,
-                        intent_id=limit_intent,
-                        trace_id="",
-                        symbol=symbol,
-                        side=close_side,
-                        qty=rounded_chunk,
-                        order_type=OrderType.LIMIT,
-                        status=OrderStatus.SUBMITTED,
-                        broker_id=result.get("orderId") or None,
-                        ts=utc_now_iso(),
-                    )
-                    # Give the limit order a moment to fill before checking remaining.
-                    await asyncio.sleep(2.0)
-                except Exception as e:
-                    logger.error("close_position limit fallback failed for %s: %s", symbol, e)
-                    break
+            await asyncio.sleep(0.4)
 
-            remaining -= rounded_chunk
-            await asyncio.sleep(0.5)
+            # Measure actual progress. If the market order did not reduce the
+            # position (thin book / max-buy-price cap), fall back to a crossing
+            # IOC limit at the best opposing-side price.
+            positions2 = await self.get_positions(symbol)
+            pos2 = next((p for p in positions2 if p.symbol == symbol), None)
+            new_remaining = pos2.qty if pos2 else 0.0
+            if new_remaining >= remaining - 1e-9 and new_remaining > 1e-9:
+                cross_price = await self._best_crossing_price(
+                    http, category, bybit_symbol, close_side, mark_price
+                )
+                if cross_price is not None:
+                    limit_intent = uuid7()
+                    self._intent_to_local[limit_intent] = order_id
+                    limit_params: dict[str, Any] = {
+                        "category": category,
+                        "symbol": bybit_symbol,
+                        "side": order_side_to_bybit(close_side),
+                        "orderType": "Limit",
+                        "qty": str(min(rounded_chunk, new_remaining)),
+                        "price": str(cross_price),
+                        "timeInForce": "IOC",
+                        "orderLinkId": limit_intent,
+                        "reduceOnly": True,
+                    }
+                    try:
+                        response = await asyncio.to_thread(http.place_order, **limit_params)
+                        result = response.get("result", {})
+                        last_order = Order(
+                            id=order_id,
+                            intent_id=limit_intent,
+                            trace_id="",
+                            symbol=symbol,
+                            side=close_side,
+                            qty=rounded_chunk,
+                            order_type=OrderType.LIMIT,
+                            status=OrderStatus.SUBMITTED,
+                            broker_id=result.get("orderId") or None,
+                            ts=utc_now_iso(),
+                        )
+                    except Exception as e:
+                        logger.debug("close_position crossing limit failed for %s: %s", symbol, e)
+                    await asyncio.sleep(0.4)
+
+                # Re-measure progress after the fallback.
+                positions3 = await self.get_positions(symbol)
+                pos3 = next((p for p in positions3 if p.symbol == symbol), None)
+                new_remaining = pos3.qty if pos3 else 0.0
+                if new_remaining >= remaining - 1e-9:
+                    no_progress += 1
+                    if no_progress >= 5:
+                        logger.warning(
+                            "close_position made no progress for %s after %d rounds; "
+                            "residual=%.6f remains",
+                            symbol, no_progress, new_remaining,
+                        )
+                        break
+                else:
+                    no_progress = 0
+            else:
+                no_progress = 0
 
         # Refresh position and, if residual remains, report the last order as partial.
         final_positions = await self.get_positions(symbol)
@@ -712,6 +745,37 @@ class BybitBroker:
                 ts=utc_now_iso(),
             )
         return last_order
+
+    async def _best_crossing_price(
+        self,
+        http: Any,
+        category: str,
+        bybit_symbol: str,
+        close_side: OrderSide,
+        fallback_mark: float,
+    ) -> float | None:
+        """Best price to cross the book for a reduce-only close order.
+
+        To close a SHORT (close_side=BUY) we lift the best ASK; to close a LONG
+        (close_side=SELL) we hit the best BID. Returns None if the book is
+        empty on the needed side.
+        """
+        try:
+            ob = await asyncio.to_thread(
+                http.get_orderbook, category=category, symbol=bybit_symbol, limit=5
+            )
+        except Exception as e:
+            logger.debug("orderbook fetch failed for %s: %s", bybit_symbol, e)
+            return None
+        # BUY crosses asks; SELL crosses bids.
+        side_key = "a" if close_side == OrderSide.BUY else "b"
+        levels = (ob.get("result") or {}).get(side_key, []) or []
+        for lvl in levels:
+            price = to_float(lvl[0]) if len(lvl) > 0 else 0.0
+            size = to_float(lvl[1]) if len(lvl) > 1 else 0.0
+            if price > 0 and size > 0:
+                return price
+        return fallback_mark if fallback_mark > 0 else None
 
     def min_qty_for(self, symbol: str) -> float:
         """Return the minimum order quantity (lot size) for a symbol."""
