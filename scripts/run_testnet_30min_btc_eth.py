@@ -76,6 +76,29 @@ def _collect_report(logs_dir: Path, symbol: str, ts: str) -> dict | None:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _recompute_report(data_dir: Path, symbol: str, ts: str):
+    """Recompute a LiveSessionReport directly from the worker's SQLite DB.
+
+    The worker serializes its report with ``json.dumps(..., default=str)``,
+    which stringifies the ``LiveSessionReport`` dataclass and makes it
+    unusable for ``format_report``. Recomputing from the DB yields a real
+    ``LiveSessionReport`` with correct attribute access (n_orders, n_fills,
+    n_trades, per-symbol breakdown, etc.).
+    """
+    from kairon.live.analytics import compute_session_report
+    from kairon.live.store import LiveStore
+
+    safe = symbol.replace("-", "_")
+    db = data_dir / f"runs_testnet_30min_{safe}_{ts}.db"
+    if not db.exists():
+        return None
+    store = LiveStore(db)
+    try:
+        return compute_session_report(store, timeframe="1m", session_id=f"testnet-{symbol}")
+    finally:
+        store.close()
+
+
 def _format_money(v) -> str:
     return f"${_safe_num(v):,.2f}"
 
@@ -216,10 +239,13 @@ def main(argv: list[str] | None = None) -> int:
         final = _safe_num(rep["final_balance"])
         pnl = _safe_num(rep["total_pnl"])
         pct = _safe_num(rep["total_pnl_pct"])
-        rpt = rep.get("report", {})
-        orders = int(getattr(rpt, "n_orders", 0))
-        fills = int(getattr(rpt, "n_fills", 0))
-        trades = int(getattr(rpt, "n_trades", 0))
+        rpt = _recompute_report(data_dir, sym, ts)
+        if rpt is None:
+            print(f"WARNING: could not recompute report from DB for {sym}; "
+                  f"using the worker's scalar summary only.")
+        orders = int(getattr(rpt, "n_orders", 0)) if rpt is not None else 0
+        fills = int(getattr(rpt, "n_fills", 0)) if rpt is not None else 0
+        trades = int(getattr(rpt, "n_trades", 0)) if rpt is not None else 0
         total_initial += initial
         total_final += final
         total_pnl += pnl
@@ -249,16 +275,14 @@ def main(argv: list[str] | None = None) -> int:
 
     lines.append("## Per-symbol detail")
     lines.append("")
+    from kairon.live.analytics import format_report
     for rep in reports:
         sym = rep["symbol"]
-        rpt = rep.get("report")
-        if rpt is None:
-            continue
+        rpt = _recompute_report(data_dir, sym, ts)
         lines.append(f"### {sym}")
         lines.append("")
         lines.append("```")
-        from kairon.live.analytics import format_report
-        lines.append(format_report(rpt))
+        lines.append(format_report(rpt) if rpt is not None else "(report unavailable)")
         lines.append("```")
         lines.append("")
 
