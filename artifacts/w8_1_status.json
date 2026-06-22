@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "story_id": "W8.1",
-  "decided_at_iso": "2026-06-15T06:37:30Z",
+  "decided_at_iso": "2026-06-22T07:32:45Z",
   "symbol": "BTCUSDT",
   "timeframe": "1h",
   "data_source": "synthetic BTCUSDT 1h log-normal price walk (W0 BTC-only fallback; ccxt public-REST path is a 1-PR follow-up). n_bars=4320, sigma=0.005, seed=20260608.",

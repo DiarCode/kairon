@@ -1,7 +1,7 @@
 # W8 — End-to-end BTCUSDT 1h backtest
 
 **Story:** W8.1  
-**Decided at:** 2026-06-15T06:37:30Z  
+**Decided at:** 2026-06-22T07:32:45Z  
 **Symbol:** BTCUSDT  
 **Timeframe:** 1h  
 **N bars:** 4320  
