@@ -21,7 +21,10 @@ import numpy as np
 import pyarrow as pa
 
 from kairon.data.io import OHLCV_SCHEMA
+from kairon.live.orderflow import OrderFlowSnapshot, orderflow_alignment
 from kairon.live.predictor import LivePrediction
+from kairon.live.regime import Regime, classify_regime
+from kairon.live.setup_matrix import SetupMatrix
 
 # ---------------------------------------------------------------------------
 # Protocol
@@ -324,7 +327,436 @@ class MomentumStrategy:
         )
 
 
-__all__ = ["ComprehensiveStrategy", "MACrossoverStrategy", "MomentumStrategy", "SignalStrategy"]
+# ---------------------------------------------------------------------------
+# ScalpingStrategy
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ScalpingStrategy:
+    """High-frequency, short-tilted scalping strategy.
+
+    Fires far more often than :class:`ComprehensiveStrategy` by using lower
+    confluence thresholds and a mean-reversion + breakdown short setup (plus a
+    symmetric long setup when ``long_allowed``). Computes ATR-based per-signal
+    stop-loss/take-profit and stores them in :attr:`last_indicator_snapshot`
+    (``sl_price`` / ``tp_price``) so the orchestrator can attach native
+    exchange-side TP/SL to the entry order.
+
+    Short setup (primary, short-tilted): overbought mean-reversion —
+    ``(RSI>overbought_rsi OR Stoch %K>overbought_stoch OR close>=upper BB)`` AND
+    ``(MACD hist<0 OR close<VWAP)``; OR a breakdown short — ``close<=lower BB``
+    with a volume surge; OR a **momentum trend-following short** —
+    ``EMA fast<slow AND MACD hist<0 AND close<VWAP AND ADX>strong_trend_adx``
+    (rides an established downtrend; the mean-reversion paths above cannot short
+    a crash because RSI/Stoch go oversold and the Bollinger band widens below
+    price, and testnet volume rarely surges). Long setup (secondary): symmetric
+    oversold+bullish-confirmation, an upper-BB breakout with volume, or a
+    momentum trend-following long.
+
+    A trend filter refuses to short into a strong uptrend (EMA fast>>slow AND
+    ADX>strong_trend_adx) and refuses to long into a strong downtrend,
+    preserving the repo's "no shorting into uptrends" safety (commit f46e3de).
+    Set ``short_only=True`` to suppress longs entirely (risky in uptrends).
+    """
+
+    ema_fast: int = 9
+    ema_slow: int = 21
+    rsi_period: int = 14
+    atr_period: int = 14
+    macd_fast: int = 12
+    macd_slow: int = 26
+    macd_signal: int = 9
+    bollinger_period: int = 20
+    bollinger_std: float = 2.0
+    stoch_k_period: int = 14
+    stoch_d_period: int = 3
+    adx_period: int = 14
+    confidence_floor: float = 0.4
+    confidence_ceiling: float = 0.85
+    min_confluence: float = 0.08
+    overbought_rsi: float = 65.0
+    oversold_rsi: float = 35.0
+    overbought_stoch: float = 80.0
+    oversold_stoch: float = 20.0
+    volume_surge_mult: float = 1.3
+    strong_trend_adx: float = 25.0
+    atr_sl_mult: float = 1.0
+    max_sl_pct: float = 0.04
+    rr_ratio: float = 1.3
+    long_allowed: bool = True
+    short_only: bool = False
+    # Opt-in setup-selection matrix (Phase 2). ``None`` preserves the legacy
+    # "all setups fire" behaviour byte-for-byte; passing a SetupMatrix applies
+    # regime gating, exhaustion guard, MTF bias, and confidence calibration.
+    setup_matrix: SetupMatrix | None = None
+    # Opt-in order-flow / microstructure confluence (Phase 4b). When True the
+    # live loop polls the order book and sets ``last_orderflow`` before each
+    # predict; the strategy nudges confidence toward the side the book leans
+    # (bid-heavy supports a long bounce, ask-heavy supports a short fade). The
+    # nudge scales confidence-scaled position size — an opposed book shrinks
+    # the entry, an aligned book grows it — so the entry-timing signal routes
+    # through sizing, not through a hard flatten. Default False -> no
+    # order-flow input, legacy behaviour byte-for-byte.
+    use_orderflow: bool = False
+    orderflow_weight: float = 0.15  # max +/- confidence nudge (0.15 = +/-15%)
+    last_orderflow: OrderFlowSnapshot | None = field(default=None, repr=False, hash=False)
+
+    _buffer: deque = field(default_factory=lambda: deque(maxlen=120), repr=False, hash=False)
+    _last_snapshot: dict[str, float | None] | None = field(default=None, repr=False, hash=False)
+    _last_justifications: tuple[str, ...] = field(default_factory=tuple, repr=False, hash=False)
+    _last_confluence: dict[str, float] | None = field(default=None, repr=False, hash=False)
+
+    @property
+    def warmup_bars(self) -> int:
+        return max(self.ema_slow + 1, self.macd_slow + self.macd_signal + 1, self.bollinger_period, 30)
+
+    @property
+    def last_indicator_snapshot(self) -> dict[str, float | None]:
+        """Return the most recent indicator values for journal persistence."""
+        return self._last_snapshot or {}
+
+    @property
+    def last_justifications(self) -> tuple[str, ...]:
+        """Return the most recent justifications for journal persistence."""
+        return self._last_justifications
+
+    @property
+    def last_confluence_scores(self) -> dict[str, float]:
+        """Return the most recent confluence score breakdown."""
+        return self._last_confluence or {}
+
+    def predict(self, bars: pa.Table, symbol: str) -> LivePrediction:
+        """Compute a short-tilted scalping LivePrediction with ATR-based SL/TP."""
+        from datetime import UTC, datetime
+
+        n = bars.num_rows
+        neutral = LivePrediction(
+            symbol=symbol, direction=0.0, magnitude=0.0,
+            volatility=0.01, confidence=self.confidence_floor,
+            horizon="scalp", ts=datetime.now(UTC).isoformat(), justifications=(),
+        )
+        if n < self.warmup_bars:
+            return neutral
+
+        closes = np.array(bars.column("close").to_pylist(), dtype=float)
+        highs = np.array(bars.column("high").to_pylist(), dtype=float)
+        lows = np.array(bars.column("low").to_pylist(), dtype=float)
+        volumes = np.array(bars.column("volume").to_pylist(), dtype=float)
+
+        fast_ema = _ema(closes, self.ema_fast)
+        slow_ema = _ema(closes, self.ema_slow)
+        rsi_values = _rsi(closes, self.rsi_period)
+        atr_values = _atr(highs, lows, closes, self.atr_period)
+        _macd_line, _macd_signal, macd_hist = _macd(closes, self.macd_fast, self.macd_slow, self.macd_signal)
+        adx_values = _adx(highs, lows, closes, self.adx_period)
+        bb_upper, _bb_mid, bb_lower = _bollinger(closes, self.bollinger_period, self.bollinger_std)
+        stoch_k, _stoch_d = _stochastic(highs, lows, closes, self.stoch_k_period, self.stoch_d_period)
+        vwap_values = _vwap(highs, lows, closes, volumes)
+
+        current_close = float(closes[-1])
+        current_high = float(highs[-1])
+        current_low = float(lows[-1])
+        current_volume = float(volumes[-1])
+        current_fast = float(fast_ema[-1]) if not np.isnan(fast_ema[-1]) else current_close
+        current_slow = float(slow_ema[-1]) if not np.isnan(slow_ema[-1]) else current_close
+        current_rsi = float(rsi_values[-1]) if not np.isnan(rsi_values[-1]) else 50.0
+        current_atr = float(atr_values[-1]) if not np.isnan(atr_values[-1]) else current_close * 0.001
+        current_hist = float(macd_hist[-1]) if not np.isnan(macd_hist[-1]) else 0.0
+        current_adx = float(adx_values[-1]) if not np.isnan(adx_values[-1]) else 0.0
+        current_bb_upper = float(bb_upper[-1]) if not np.isnan(bb_upper[-1]) else None
+        current_bb_lower = float(bb_lower[-1]) if not np.isnan(bb_lower[-1]) else None
+        current_stoch_k = float(stoch_k[-1]) if not np.isnan(stoch_k[-1]) else 50.0
+        current_vwap = float(vwap_values[-1]) if not np.isnan(vwap_values[-1]) else current_close
+
+        avg_vol = float(np.mean(volumes[-20:])) if n >= 20 else float(np.mean(volumes))
+        volume_vs_avg = current_volume / max(avg_vol, 1e-9)
+        volume_surge = volume_vs_avg >= self.volume_surge_mult
+
+        justifications: list[str] = []
+        trend_score = 0.0
+        momentum_score = 0.0
+        structure_score = 0.0
+        volume_score = 0.0
+
+        ema_bullish = current_fast > current_slow
+        ema_bearish = current_fast < current_slow
+        strong_uptrend = ema_bullish and current_adx > self.strong_trend_adx
+        strong_downtrend = ema_bearish and current_adx > self.strong_trend_adx
+
+        # ---- Short setup (primary) ----
+        overbought = (
+            current_rsi > self.overbought_rsi
+            or current_stoch_k > self.overbought_stoch
+            or (current_bb_upper is not None and current_close >= current_bb_upper)
+        )
+        bearish_confirm = current_hist < 0 or current_close < current_vwap
+        breakdown = (
+            current_bb_lower is not None
+            and current_close <= current_bb_lower
+            and volume_surge
+        )
+        # Momentum trend-following short: ride an established downtrend. The
+        # mean-reversion paths above cannot short a real crash (RSI/Stoch go
+        # oversold, the Bollinger band widens below price, and testnet volume
+        # rarely surges), so without this the strategy is silent in downtrends.
+        momentum_short = (
+            ema_bearish
+            and current_hist < 0
+            and current_close < current_vwap
+            and current_adx > self.strong_trend_adx
+        )
+        short_signal = (overbought and bearish_confirm) or breakdown or momentum_short
+
+        # ---- Long setup (secondary) ----
+        oversold = (
+            current_rsi < self.oversold_rsi
+            or current_stoch_k < self.oversold_stoch
+            or (current_bb_lower is not None and current_close <= current_bb_lower)
+        )
+        bullish_confirm = current_hist > 0 or current_close > current_vwap
+        breakout = (
+            current_bb_upper is not None
+            and current_close >= current_bb_upper
+            and volume_surge
+        )
+        momentum_long = (
+            ema_bullish
+            and current_hist > 0
+            and current_close > current_vwap
+            and current_adx > self.strong_trend_adx
+        )
+        long_signal = (oversold and bullish_confirm) or breakout or momentum_long
+
+        direction = 0.0
+        if short_signal and not strong_uptrend:
+            direction = -1.0
+            if overbought:
+                justifications.append("Overbought mean-reversion short")
+                momentum_score += 0.10
+            if breakdown:
+                justifications.append("Breakdown below lower Bollinger + volume surge")
+                structure_score += 0.10
+            if momentum_short:
+                justifications.append("Momentum trend-following short (bearish EMA/MACD, below VWAP)")
+                trend_score += 0.12
+            if current_hist < 0:
+                justifications.append("MACD histogram bearish")
+                momentum_score += 0.06
+            if current_close < current_vwap:
+                justifications.append("Price below VWAP (bearish)")
+                volume_score += 0.06
+            if ema_bearish and current_adx > self.strong_trend_adx:
+                justifications.append(f"Strong bearish trend (ADX={current_adx:.1f})")
+                trend_score += 0.08
+        elif (
+            long_signal and self.long_allowed and not self.short_only and not strong_downtrend
+        ):
+            direction = 1.0
+            if oversold:
+                justifications.append("Oversold mean-reversion long")
+                momentum_score += 0.10
+            if breakout:
+                justifications.append("Breakout above upper Bollinger + volume surge")
+                structure_score += 0.10
+            if momentum_long:
+                justifications.append("Momentum trend-following long (bullish EMA/MACD, above VWAP)")
+                trend_score += 0.12
+            if current_hist > 0:
+                justifications.append("MACD histogram bullish")
+                momentum_score += 0.06
+            if current_close > current_vwap:
+                justifications.append("Price above VWAP (bullish)")
+                volume_score += 0.06
+            if ema_bullish and current_adx > self.strong_trend_adx:
+                justifications.append(f"Strong bullish trend (ADX={current_adx:.1f})")
+                trend_score += 0.08
+
+        total_confluence = trend_score + momentum_score + structure_score + volume_score
+        if direction != 0.0 and total_confluence < self.min_confluence:
+            justifications.append(f"Confluence too low ({total_confluence:.3f}); flattened")
+            direction = 0.0
+
+        # ---- Phase 2: setup-selection matrix (opt-in, default off) ----
+        # When a SetupMatrix is configured, tag the fired setup, gate it by
+        # regime / exhaustion / MTF, and calibrate confidence. ``None`` keeps the
+        # legacy behaviour (all setups fire, no gates).
+        setup_id: str | None = None
+        regime: Regime | None = None
+        calib_multiplier = 1.0
+        if self.setup_matrix is not None and direction != 0.0:
+            bb_width_pct = (
+                (current_bb_upper - current_bb_lower) / current_close
+                if (current_bb_upper is not None and current_bb_lower is not None
+                    and current_close > 0)
+                else 0.0
+            )
+            ema_slope = (current_fast - current_slow) / current_close if current_close > 0 else 0.0
+            regime = classify_regime(
+                adx=current_adx, bb_width_pct=bb_width_pct, ema_slope=ema_slope,
+            )
+            # Identify which setup fired (priority: MR > breakdown/breakout >
+            # momentum, mirroring the short_signal/long_signal OR order).
+            if direction < 0:
+                setup_id = (
+                    "mr_short" if (overbought and bearish_confirm)
+                    else ("breakdown" if breakdown else "momentum_short")
+                )
+            else:
+                setup_id = (
+                    "mr_long" if (oversold and bullish_confirm)
+                    else ("breakout" if breakout else "momentum_long")
+                )
+            matrix = self.setup_matrix
+            if not matrix.allowed(setup_id, regime):
+                justifications.append(f"{setup_id} gated off by regime={regime.value}")
+                direction = 0.0
+                setup_id = None
+            else:
+                # Exhaustion guard: skip MR at extreme extremes (continuation,
+                # not reversion). RSI>85 short / RSI<15 long = price likely
+                # keeps going, not reverting.
+                if matrix.exhaustion_guard and setup_id in ("mr_short", "mr_long"):
+                    if setup_id == "mr_short" and current_rsi > 85:
+                        justifications.append(f"Exhaustion guard: RSI={current_rsi:.1f}>85 (short extended)")
+                        direction = 0.0
+                        setup_id = None
+                    elif setup_id == "mr_long" and current_rsi < 15:
+                        justifications.append(f"Exhaustion guard: RSI={current_rsi:.1f}<15 (long capitulation)")
+                        direction = 0.0
+                        setup_id = None
+                # MTF bias: a longer EMA (~2x slow) as the higher-timeframe trend.
+                # Don't take counter-trend MR (bottom-picking in a downtrend /
+                # top-picking in an uptrend beyond 2%).
+                if matrix.mtf_bias and direction != 0.0 and setup_id is not None:
+                    higher_tf = float(_ema(closes, self.ema_slow * 2)[-1])
+                    if not math.isnan(higher_tf) and current_close > 0:
+                        dev = (current_close - higher_tf) / current_close
+                        if setup_id == "mr_long" and dev < -0.02:
+                            justifications.append(f"MTF bias: close {dev*100:.1f}% below higher-TF EMA (downtrend)")
+                            direction = 0.0
+                            setup_id = None
+                        elif setup_id == "mr_short" and dev > 0.02:
+                            justifications.append(f"MTF bias: close {dev*100:.1f}% above higher-TF EMA (uptrend)")
+                            direction = 0.0
+                            setup_id = None
+                # Confidence calibration: data-discovered per-setup win-rate scaling.
+                # MR (the edge) gets a bonus; the killers (momentum/breakout)
+                # get suppressed even if an opt-in matrix re-enables them.
+                if matrix.confidence_calibration and direction != 0.0 and setup_id is not None:
+                    calib_multiplier = {
+                        "mr_short": 1.15, "mr_long": 1.15,
+                        "breakdown": 0.80, "breakout": 0.80,
+                        "momentum_short": 0.60, "momentum_long": 0.60,
+                    }.get(setup_id, 1.0)
+
+        # ---- Phase 4b: order-flow confluence nudge (opt-in, default off) ----
+        # When ``use_orderflow`` and a fresh snapshot is present, nudge the
+        # confidence multiplier toward the side the book leans. The nudge
+        # routes through confidence-scaled sizing (opposed book -> smaller
+        # entry, aligned book -> larger entry) rather than a hard flatten, so a
+        # thin/ambiguous book is a no-op (alignment ~0 -> multiplier ~1.0).
+        orderflow_mult = 1.0
+        if self.use_orderflow and self.last_orderflow is not None and direction != 0.0:
+            align = orderflow_alignment(self.last_orderflow, direction)
+            orderflow_mult = 1.0 + self.orderflow_weight * align
+            if align > 0.25:
+                justifications.append(
+                    f"Order-flow supports entry (imbalance={self.last_orderflow.imbalance:.2f})"
+                )
+            elif align < -0.25:
+                justifications.append(
+                    f"Order-flow opposes entry (imbalance={self.last_orderflow.imbalance:.2f})"
+                )
+
+        confidence = self.confidence_floor
+        if direction != 0.0:
+            confidence = min(
+                self.confidence_ceiling,
+                (self.confidence_floor + total_confluence * 1.2) * calib_multiplier * orderflow_mult,
+            )
+            confidence = max(self.confidence_floor, min(self.confidence_ceiling, confidence))
+
+        # ---- ATR-based per-signal SL/TP (capped to a max fraction of price) ----
+        # A bare ``atr_sl_mult * ATR`` stop can be absurdly wide on a volatile
+        # bar (e.g. testnet SOL swinging 46->72->51 gives ATR ~20, a 40% stop),
+        # which collapses risk-sized quantity below the min lot. Capping the
+        # stop distance to ``max_sl_pct`` of price keeps the stop sane and the
+        # risk-sized position tradeable.
+        sl_distance = min(self.atr_sl_mult * current_atr, current_close * self.max_sl_pct)
+        if direction < 0:  # short: SL above entry, TP below
+            sl_price = current_close + sl_distance
+            tp_price = current_close - self.rr_ratio * sl_distance
+        elif direction > 0:  # long: SL below entry, TP above
+            sl_price = current_close - sl_distance
+            tp_price = current_close + self.rr_ratio * sl_distance
+        else:
+            sl_price = None
+            tp_price = None
+
+        magnitude = max(current_atr / max(current_close, 1e-9), 0.001)
+        volatility = max(current_atr / max(current_close, 1e-9), 0.001)
+
+        self._last_snapshot = {
+            "ema_fast": float(current_fast),
+            "ema_slow": float(current_slow),
+            "rsi_14": float(current_rsi),
+            "atr_14": float(current_atr),
+            "macd_histogram": float(current_hist),
+            "adx": float(current_adx),
+            "bollinger_upper": current_bb_upper,
+            "bollinger_lower": current_bb_lower,
+            "stochastic_k": float(current_stoch_k),
+            "vwap": float(current_vwap),
+            "volume_vs_avg": float(volume_vs_avg),
+            "close": float(current_close),
+            "high": float(current_high),
+            "low": float(current_low),
+            "volume": float(current_volume),
+            "sl_price": sl_price,
+            "tp_price": tp_price,
+            "setup_id": setup_id,
+            "regime": regime.value if regime is not None else None,
+            "of_imbalance": (
+                self.last_orderflow.imbalance
+                if self.use_orderflow and self.last_orderflow is not None else None
+            ),
+            "of_spread_pct": (
+                self.last_orderflow.spread_pct
+                if self.use_orderflow and self.last_orderflow is not None else None
+            ),
+            "of_depth_ratio": (
+                self.last_orderflow.depth_ratio
+                if self.use_orderflow and self.last_orderflow is not None else None
+            ),
+        }
+        self._last_justifications = tuple(justifications)
+        self._last_confluence = {
+            "trend": round(trend_score, 4),
+            "momentum": round(momentum_score, 4),
+            "structure": round(structure_score, 4),
+            "volume": round(volume_score, 4),
+        }
+
+        return LivePrediction(
+            symbol=symbol,
+            direction=direction,
+            magnitude=magnitude,
+            volatility=volatility,
+            confidence=confidence,
+            horizon="scalp",
+            ts=datetime.now(UTC).isoformat(),
+            justifications=tuple(justifications),
+        )
+
+
+__all__ = [
+    "ComprehensiveStrategy",
+    "MACrossoverStrategy",
+    "MomentumStrategy",
+    "ScalpingStrategy",
+    "SignalStrategy",
+]
 
 
 # ---------------------------------------------------------------------------

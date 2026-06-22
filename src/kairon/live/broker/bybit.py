@@ -321,9 +321,15 @@ class BybitBroker:
         if order.price is not None:
             params["price"] = str(order.price)
         if order.sl is not None:
-            params["stopLoss"] = str(order.sl)
+            params["stopLoss"] = str(_round_price(order.symbol, float(order.sl)))
         if order.tp is not None:
-            params["takeProfit"] = str(order.tp)
+            params["takeProfit"] = str(_round_price(order.symbol, float(order.tp)))
+        if order.reduce_only:
+            # Marks the order as position-reducing only. Bybit rejects a
+            # reduce-only order that would not reduce an open position, so this
+            # must only be set on genuine close/reduce orders (software stops,
+            # signal-flip flattens, session-end flatten).
+            params["reduceOnly"] = "true"
 
         try:
             response = await asyncio.to_thread(http.place_order, **params)
@@ -470,6 +476,57 @@ class BybitBroker:
         except Exception as e:
             logger.error("BybitBroker.get_open_orders failed: %s", e)
             return []
+
+    async def get_last_price(self, symbol: str) -> float | None:
+        """Fetch the live last price for a symbol from Bybit.
+
+        Used by the scalping orchestrator to re-anchor ATR-based TP/SL to the
+        current market price at order time — the strategy computes stops
+        relative to the 1m bar close, which can differ materially from the live
+        price on a volatile book, and Bybit validates attached TP/SL against
+        the live last price (not the bar close). Returns ``None`` on failure so
+        callers can fall back to the bar-close-anchored stops.
+        """
+        http = self._ensure_http()
+        try:
+            bybit_symbol, category = symbol_str_to_bybit(symbol)
+            tickers = await asyncio.to_thread(
+                http.get_tickers, category=category, symbol=bybit_symbol
+            )
+            ticker_list = tickers.get("result", {}).get("list", [])
+            if not ticker_list:
+                return None
+            # Prefer lastPrice (trade price); fall back to markPrice.
+            price = ticker_list[0].get("lastPrice") or ticker_list[0].get("markPrice")
+            return to_float(price) if price not in (None, "") else None
+        except Exception as e:
+            logger.debug("BybitBroker.get_last_price failed for %s: %s", symbol, e)
+            return None
+
+
+    async def get_orderbook(self, symbol: str, depth: int = 5) -> dict | None:
+        """Fetch the live order book (top ``depth`` bid/ask levels) for a symbol.
+
+        Returns ``{"bids": [[price, size], ...], "asks": [[price, size], ...]}``
+        normalized from Bybit's ``get_orderbook`` response, or ``None`` on
+        failure (thin testnet book, transient API error). Used by the Phase 4b
+        order-flow poller to compute imbalance / spread / depth for entry-timing.
+        """
+        http = self._ensure_http()
+        try:
+            bybit_symbol, category = symbol_str_to_bybit(symbol)
+            ob = await asyncio.to_thread(
+                http.get_orderbook, category=category, symbol=bybit_symbol, limit=depth
+            )
+        except Exception as e:
+            logger.debug("BybitBroker.get_orderbook failed for %s: %s", symbol, e)
+            return None
+        result = (ob or {}).get("result") or {}
+        return {
+            "bids": list(result.get("b") or []),
+            "asks": list(result.get("a") or []),
+        }
+
 
     async def get_closed_pnl(
         self, symbol: str, *, limit: int = 50, start_time_ms: int | None = None, end_time_ms: int | None = None

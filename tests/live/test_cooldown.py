@@ -175,3 +175,123 @@ class TestCooledTradingLoopSuppression:
                 assert pred.confidence == 0.8
             finally:
                 store.close()
+
+
+# ---------------------------------------------------------------------------
+# Phase 4b: order-flow provider injection in _make_prediction
+# ---------------------------------------------------------------------------
+
+
+class _OrderFlowStrategy:
+    """Records the order-flow snapshot set on it before predict runs.
+
+    Mirrors the real ``ScalpingStrategy`` contract: a ``use_orderflow`` flag the
+    orchestrator gates on, a ``last_orderflow`` attribute it writes, and a
+    ``predict`` that the loop calls after the injection.
+    """
+
+    warmup_bars = 2
+    use_orderflow = True
+    last_orderflow: object | None = None
+    seen: object | None = None  # captured at predict time
+
+    def predict(self, bar_table: object, symbol: str) -> LivePrediction:
+        self.seen = self.last_orderflow
+        return LivePrediction(
+            symbol=symbol, direction=1.0, magnitude=0.5, volatility=0.01,
+            confidence=0.8, horizon="day", ts="2026-06-22T00:00:00+00:00",
+        )
+
+
+class TestOrderflowProviderInjection:
+    async def test_provider_injects_snapshot_before_predict(self) -> None:
+        snapshot = object()
+        config = _make_config()
+        with TemporaryDirectory() as tmpdir:
+            store = LiveStore(Path(tmpdir) / "test.db")
+            try:
+                strat = _OrderFlowStrategy()
+                loop = CooledTradingLoop(
+                    config=config,
+                    broker=CooldownBrokerWrapper(_StubBroker()),
+                    strategy=strat, guardian=Guardian(), reconciler=Reconciler(),
+                    store=store, feed=object(),
+                    orderflow_provider=lambda sym: snapshot,
+                )
+                loop._buffer_to_table = lambda symbol: _FakeTable()  # type: ignore[assignment]
+                pred = loop._make_prediction("BTC-USDT-PERP")
+                assert pred.direction == 1.0
+                # The snapshot was set on the strategy BEFORE predict ran.
+                assert strat.seen is snapshot
+            finally:
+                store.close()
+
+    async def test_no_provider_leaves_last_orderflow_untouched(self) -> None:
+        config = _make_config()
+        with TemporaryDirectory() as tmpdir:
+            store = LiveStore(Path(tmpdir) / "test.db")
+            try:
+                strat = _OrderFlowStrategy()
+                strat.last_orderflow = "preexisting"
+                loop = CooledTradingLoop(
+                    config=config,
+                    broker=CooldownBrokerWrapper(_StubBroker()),
+                    strategy=strat, guardian=Guardian(), reconciler=Reconciler(),
+                    store=store, feed=object(),
+                    # No orderflow_provider -> legacy path, snapshot untouched.
+                )
+                loop._buffer_to_table = lambda symbol: _FakeTable()  # type: ignore[assignment]
+                loop._make_prediction("BTC-USDT-PERP")
+                assert strat.seen == "preexisting"
+            finally:
+                store.close()
+
+    async def test_provider_exception_does_not_crash_loop(self) -> None:
+        def _boom(_sym: str) -> object:
+            raise RuntimeError("orderbook fetch failed")
+
+        config = _make_config()
+        with TemporaryDirectory() as tmpdir:
+            store = LiveStore(Path(tmpdir) / "test.db")
+            try:
+                strat = _OrderFlowStrategy()
+                loop = CooledTradingLoop(
+                    config=config,
+                    broker=CooldownBrokerWrapper(_StubBroker()),
+                    strategy=strat, guardian=Guardian(), reconciler=Reconciler(),
+                    store=store, feed=object(),
+                    orderflow_provider=_boom,
+                )
+                loop._buffer_to_table = lambda symbol: _FakeTable()  # type: ignore[assignment]
+                pred = loop._make_prediction("BTC-USDT-PERP")
+                # Fail-soft: prediction still runs, snapshot reset to None.
+                assert pred.direction == 1.0
+                assert strat.seen is None
+            finally:
+                store.close()
+
+    async def test_provider_not_called_when_use_orderflow_false(self) -> None:
+        calls: list[str] = []
+
+        def _provider(sym: str) -> object:
+            calls.append(sym)
+            return object()
+
+        config = _make_config()
+        with TemporaryDirectory() as tmpdir:
+            store = LiveStore(Path(tmpdir) / "test.db")
+            try:
+                strat = _OrderFlowStrategy()
+                strat.use_orderflow = False  # master switch off -> no injection
+                loop = CooledTradingLoop(
+                    config=config,
+                    broker=CooldownBrokerWrapper(_StubBroker()),
+                    strategy=strat, guardian=Guardian(), reconciler=Reconciler(),
+                    store=store, feed=object(),
+                    orderflow_provider=_provider,
+                )
+                loop._buffer_to_table = lambda symbol: _FakeTable()  # type: ignore[assignment]
+                loop._make_prediction("BTC-USDT-PERP")
+                assert calls == []  # provider gated off, never invoked
+            finally:
+                store.close()
