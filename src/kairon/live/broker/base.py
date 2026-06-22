@@ -13,7 +13,6 @@ from typing import Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
 
-
 # ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------
@@ -63,6 +62,10 @@ class Order(BaseModel, frozen=True, strict=True):
     price: float | None = Field(default=None, description="Limit price (None for market)")
     sl: float | None = Field(default=None, description="Stop-loss price")
     tp: float | None = Field(default=None, description="Take-profit price")
+    reduce_only: bool = Field(
+        default=False,
+        description="If True, the order may only reduce an existing position (no new/opening exposure).",
+    )
     status: OrderStatus = Field(default=OrderStatus.PENDING)
     broker_id: str | None = Field(default=None, description="Broker-assigned order ID")
     ts: str = Field(description="ISO-8601 UTC timestamp when intent was created")
@@ -150,12 +153,12 @@ class Broker(Protocol):
 
 
 __all__ = [
-    "Broker",
-    "Order",
-    "Fill",
-    "Position",
     "Balance",
+    "Broker",
+    "Fill",
+    "Order",
     "OrderSide",
-    "OrderType",
     "OrderStatus",
+    "OrderType",
+    "Position",
 ]

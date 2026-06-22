@@ -97,6 +97,13 @@ class IndicatorSnapshot:
     low: float | None = None
     volume: float | None = None
 
+    # Setup-selection (Phase 2): the canonical setup id the strategy identified
+    # (e.g. "mr_short", "breakdown") and the coarse regime that gated it. ``None``
+    # for legacy/ungated strategies. Stored so the per-setup edge report and the
+    # drift kill-switch can bucket live outcomes by setup without a schema change.
+    setup_id: str | None = None
+    regime: str | None = None
+
 
 @dataclass(frozen=True, slots=True)
 class RiskSnapshot:

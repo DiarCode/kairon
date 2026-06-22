@@ -1,7 +1,7 @@
 # W8 — End-to-end BTCUSDT 5m backtest
 
 **Story:** W8.2  
-**Decided at:** 2026-06-15T06:37:34Z  
+**Decided at:** 2026-06-22T07:32:49Z  
 **Symbol:** BTCUSDT  
 **Timeframe:** 5m  
 **N bars:** 51840  

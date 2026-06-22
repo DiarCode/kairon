@@ -90,7 +90,7 @@ def start(
     strategy: str = typer.Option(
         "comprehensive",
         "--strategy",
-        help="Trading strategy: comprehensive, ma_crossover, or momentum.",
+        help="Trading strategy: comprehensive, ma_crossover, momentum, or scalping.",
     ),
     db: str | None = typer.Option(None, "--db", help="Path to runs.db."),
 ) -> None:
@@ -335,6 +335,7 @@ def _run_trading_loop(  # noqa: PLR0915
         ComprehensiveStrategy,
         MACrossoverStrategy,
         MomentumStrategy,
+        ScalpingStrategy,
     )
 
     # Configure logging
@@ -425,6 +426,7 @@ def _run_trading_loop(  # noqa: PLR0915
         "comprehensive": ComprehensiveStrategy,
         "ma_crossover": MACrossoverStrategy,
         "momentum": MomentumStrategy,
+        "scalping": ScalpingStrategy,
     }
     strategy_cls = strategy_map.get(strategy_name)
     if strategy_cls is None:

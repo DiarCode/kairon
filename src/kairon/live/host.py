@@ -157,7 +157,12 @@ class SessionHost:
             from kairon.live.feed import CcxtCandleFeed, CcxtCandleFeedConfig
             from kairon.live.guardian import Guardian
             from kairon.live.reconciler import Reconciler
-            from kairon.live.strategy import ComprehensiveStrategy
+            from kairon.live.strategy import (
+                ComprehensiveStrategy,
+                MACrossoverStrategy,
+                MomentumStrategy,
+                ScalpingStrategy,
+            )
 
             symbols = _to_symbol_tuple(config.symbols)
             session_id = uuid.uuid4().hex[:12]
@@ -216,7 +221,14 @@ class SessionHost:
                 store=store,
                 broker=wrapped,
             )
-            strategy = ComprehensiveStrategy()
+            _strategy_map = {
+                "comprehensive": ComprehensiveStrategy,
+                "ma_crossover": MACrossoverStrategy,
+                "momentum": MomentumStrategy,
+                "scalping": ScalpingStrategy,
+            }
+            _strategy_cls = _strategy_map.get(config.strategy_name, ComprehensiveStrategy)
+            strategy = _strategy_cls()
             loop = CooledTradingLoop(
                 config=config,
                 broker=wrapped,

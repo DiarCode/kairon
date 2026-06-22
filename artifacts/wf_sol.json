@@ -1,0 +1,176 @@
+{
+  "symbol": "SOL-USDT-PERP",
+  "train_fraction": 0.75,
+  "timeframes": {
+    "5m": {
+      "total_bars": 16128,
+      "train_bars": 12096,
+      "test_bars": 4032,
+      "split": {
+        "last_train_ts": "2026-06-05T13:10:00+00:00",
+        "first_test_ts": "2026-06-05T13:15:00+00:00"
+      },
+      "matrices": {
+        "long-only": {
+          "train": {
+            "mr_long": {
+              "setup": "mr_long",
+              "side": "long",
+              "n": 72,
+              "win_rate": 0.7361,
+              "hit_tp": 53,
+              "hit_sl": 19,
+              "sum_pnl": 19.2385,
+              "avg_rr": 0.569
+            },
+            "mr_short": null
+          },
+          "test": {
+            "mr_long": {
+              "setup": "mr_long",
+              "side": "long",
+              "n": 20,
+              "win_rate": 0.95,
+              "hit_tp": 19,
+              "hit_sl": 1,
+              "sum_pnl": 6.9591,
+              "avg_rr": 1.113
+            },
+            "mr_short": null
+          }
+        },
+        "mean-reversion": {
+          "train": {
+            "mr_long": {
+              "setup": "mr_long",
+              "side": "long",
+              "n": 72,
+              "win_rate": 0.7361,
+              "hit_tp": 53,
+              "hit_sl": 19,
+              "sum_pnl": 12.5992,
+              "avg_rr": 0.569
+            },
+            "mr_short": {
+              "setup": "mr_short",
+              "side": "short",
+              "n": 25,
+              "win_rate": 0.28,
+              "hit_tp": 7,
+              "hit_sl": 17,
+              "sum_pnl": -4.3704,
+              "avg_rr": -0.603
+            }
+          },
+          "test": {
+            "mr_long": {
+              "setup": "mr_long",
+              "side": "long",
+              "n": 20,
+              "win_rate": 0.95,
+              "hit_tp": 19,
+              "hit_sl": 1,
+              "sum_pnl": 6.9591,
+              "avg_rr": 1.113
+            },
+            "mr_short": {
+              "setup": "mr_short",
+              "side": "short",
+              "n": 9,
+              "win_rate": 0.6667,
+              "hit_tp": 6,
+              "hit_sl": 3,
+              "sum_pnl": 1.5703,
+              "avg_rr": 0.464
+            }
+          }
+        }
+      }
+    },
+    "15m": {
+      "total_bars": 5376,
+      "train_bars": 4032,
+      "test_bars": 1344,
+      "split": {
+        "last_train_ts": "2026-06-05T13:00:00+00:00",
+        "first_test_ts": "2026-06-05T13:15:00+00:00"
+      },
+      "matrices": {
+        "long-only": {
+          "train": {
+            "mr_long": {
+              "setup": "mr_long",
+              "side": "long",
+              "n": 11,
+              "win_rate": 0.5455,
+              "hit_tp": 6,
+              "hit_sl": 4,
+              "sum_pnl": 0.9487,
+              "avg_rr": 0.253
+            },
+            "mr_short": null
+          },
+          "test": {
+            "mr_long": {
+              "setup": "mr_long",
+              "side": "long",
+              "n": 1,
+              "win_rate": 0.0,
+              "hit_tp": 0,
+              "hit_sl": 1,
+              "sum_pnl": -0.1862,
+              "avg_rr": -1.069
+            },
+            "mr_short": null
+          }
+        },
+        "mean-reversion": {
+          "train": {
+            "mr_long": {
+              "setup": "mr_long",
+              "side": "long",
+              "n": 10,
+              "win_rate": 0.6,
+              "hit_tp": 6,
+              "hit_sl": 3,
+              "sum_pnl": 1.0441,
+              "avg_rr": 0.386
+            },
+            "mr_short": {
+              "setup": "mr_short",
+              "side": "short",
+              "n": 10,
+              "win_rate": 0.4,
+              "hit_tp": 4,
+              "hit_sl": 6,
+              "sum_pnl": -1.0002,
+              "avg_rr": -0.17
+            }
+          },
+          "test": {
+            "mr_long": {
+              "setup": "mr_long",
+              "side": "long",
+              "n": 1,
+              "win_rate": 0.0,
+              "hit_tp": 0,
+              "hit_sl": 1,
+              "sum_pnl": -0.1862,
+              "avg_rr": -1.069
+            },
+            "mr_short": {
+              "setup": "mr_short",
+              "side": "short",
+              "n": 1,
+              "win_rate": 1.0,
+              "hit_tp": 1,
+              "hit_sl": 0,
+              "sum_pnl": 0.1443,
+              "avg_rr": 0.575
+            }
+          }
+        }
+      }
+    }
+  }
+}

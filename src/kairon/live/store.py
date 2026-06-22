@@ -7,6 +7,7 @@ stdlib sqlite3 + threading.Lock pattern as RunStore.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import threading
 from datetime import UTC, datetime, timezone
@@ -130,6 +131,18 @@ CREATE TABLE IF NOT EXISTS live_decisions (
 CREATE INDEX IF NOT EXISTS idx_live_decisions_symbol ON live_decisions(symbol);
 CREATE INDEX IF NOT EXISTS idx_live_decisions_ts ON live_decisions(timestamp);
 CREATE INDEX IF NOT EXISTS idx_live_decisions_outcome ON live_decisions(outcome);
+
+CREATE TABLE IF NOT EXISTS growth_ledger (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts          TEXT NOT NULL,
+    kind        TEXT NOT NULL,
+    bankroll    REAL NOT NULL,
+    delta       REAL NOT NULL DEFAULT 0.0,
+    symbol      TEXT,
+    note        TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_growth_ledger_ts ON growth_ledger(ts);
+CREATE INDEX IF NOT EXISTS idx_growth_ledger_kind ON growth_ledger(kind);
 """
 
 
@@ -425,6 +438,49 @@ class LiveStore:
                 (_utc_now_iso(), kind, severity, payload_json),
             )
 
+    # --- Growth ledger (synthetic bankroll curve) --------------------------
+
+    def write_ledger(
+        self,
+        kind: str,
+        bankroll: float,
+        delta: float = 0.0,
+        symbol: str | None = None,
+        note: str | None = None,
+    ) -> None:
+        """Append a row to the ``growth_ledger`` bankroll curve.
+
+        ``kind`` is one of: ``start``, ``tick``, ``close`` (a closed trade's
+        realized PnL applied), ``milestone`` (bankroll crossed a target upward),
+        ``halt`` (stop_at reached or bankroll depleted), ``skip`` (a symbol was
+        below min-notional for the current bankroll).
+        """
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO growth_ledger (ts, kind, bankroll, delta, symbol, note) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (_utc_now_iso(), kind, float(bankroll), float(delta), symbol, note),
+            )
+
+    def get_ledger(self) -> list[dict[str, object]]:
+        """Return all growth_ledger rows ordered by time."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT ts, kind, bankroll, delta, symbol, note "
+                "FROM growth_ledger ORDER BY id ASC"
+            ).fetchall()
+        return [
+            {
+                "ts": r[0],
+                "kind": r[1],
+                "bankroll": r[2],
+                "delta": r[3],
+                "symbol": r[4],
+                "note": r[5],
+            }
+            for r in rows
+        ]
+
     # --- Dashboard queries --------------------------------------------------
 
     def get_recent_heartbeat(self) -> dict[str, object] | None:
@@ -638,6 +694,27 @@ class LiveStore:
                 "WHERE order_id = ?",
                 (outcome, pnl, ts or _utc_now_iso(), order_id),
             )
+
+    def decision_setup_id(self, order_id: str) -> str | None:
+        """Return the ``setup_id`` recorded on a trade decision, or ``None``.
+
+        Reads only the ``indicators_json`` blob for the given entry order, so the
+        drift kill-switch and the per-setup report can bucket a *closed* trade by
+        the setup that opened it without a full table scan or a schema change.
+        """
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT indicators_json FROM live_decisions WHERE order_id = ?",
+                (order_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        try:
+            data = json.loads(row[0] or "{}")
+        except (TypeError, ValueError):
+            return None
+        sid = data.get("setup_id")
+        return sid if isinstance(sid, str) else None
 
     def get_decisions(
         self,
